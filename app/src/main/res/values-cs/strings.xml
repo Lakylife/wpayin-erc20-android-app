@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wpayin Wallet</string>
+    <string name="secure_simple_decentralized">Bezpečná, jednoduchá, decentralizovaná</string>
+    <string name="create_new_wallet">Vytvořit novou peněženku</string>
+    <string name="import_existing_wallet">Importovat peněženku</string>
+    <string name="wallet_core_required">Pro skutečné operace s peněženkou je potřeba produkční varianta Wallet Core.</string>
+</resources>

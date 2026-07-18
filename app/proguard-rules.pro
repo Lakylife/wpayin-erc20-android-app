@@ -1,0 +1,3 @@
+-keep class wallet.core.jni.** { *; }
+-keep class com.google.protobuf.** { *; }
+-dontwarn wallet.core.jni.**

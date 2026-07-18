@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wpayin Wallet</string>
+    <string name="secure_simple_decentralized">Secure, Simple, Decentralized</string>
+    <string name="create_new_wallet">Create New Wallet</string>
+    <string name="import_existing_wallet">Import Existing Wallet</string>
+    <string name="wallet_core_required">The production Wallet Core variant is required for real wallet operations.</string>
+</resources>
