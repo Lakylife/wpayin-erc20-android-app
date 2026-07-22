@@ -37,7 +37,7 @@ enum class Blockchain(
         chainId = null,
         rpcUrls = listOf(
             "https://api.mainnet-beta.solana.com",
-            "https://solana-rpc.publicnode.com",
+            "https://solana.publicnode.com",
         ),
         explorerUrl = "https://explorer.solana.com",
         coinGeckoId = "solana",

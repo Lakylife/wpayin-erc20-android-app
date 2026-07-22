@@ -1,5 +1,6 @@
 package io.noriskservis.wpayin.wallet.ui
 
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,11 @@ import io.noriskservis.wpayin.wallet.model.TransferDraft
 import io.noriskservis.wpayin.wallet.model.Blockchain
 import io.noriskservis.wpayin.wallet.model.KnownToken
 import io.noriskservis.wpayin.wallet.model.WalletTransaction
+import io.noriskservis.wpayin.wallet.model.SavedAddress
+import io.noriskservis.wpayin.wallet.model.ExchangeQuote
+import io.noriskservis.wpayin.wallet.model.AutoLockDuration
+import io.noriskservis.wpayin.wallet.model.AppColorTheme
+import io.noriskservis.wpayin.wallet.model.AssetListStyle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,7 +30,7 @@ class MainViewModel(
     val pendingMnemonic: StateFlow<String?> = mutablePendingMnemonic.asStateFlow()
     private val mutableSessionUnlocked = MutableStateFlow(false)
     val sessionUnlocked: StateFlow<Boolean> = mutableSessionUnlocked.asStateFlow()
-    private var backgroundedAtNanos: Long? = null
+    private var backgroundedAtElapsedRealtime: Long? = null
 
     init {
         viewModelScope.launch { repository.initialize() }
@@ -96,6 +102,26 @@ class MainViewModel(
         }
     }
 
+    fun prepareExchange(
+        fromAssetId: String,
+        toAssetId: String,
+        amount: String,
+        onComplete: (Result<ExchangeQuote>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onComplete(repository.prepareExchange(fromAssetId, toAssetId, amount))
+        }
+    }
+
+    fun executeExchange(
+        quote: ExchangeQuote,
+        onComplete: (Result<WalletTransaction>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onComplete(repository.executeExchange(quote))
+        }
+    }
+
     fun addCustomToken(
         blockchain: Blockchain,
         contractAddress: String,
@@ -110,12 +136,94 @@ class MainViewModel(
 
     fun setBalancesHidden(hidden: Boolean) = repository.setBalancesHidden(hidden)
 
+    fun setAutoLockDuration(duration: AutoLockDuration) = repository.setAutoLockDuration(duration)
+
     fun setCurrency(code: String) = repository.setCurrency(code)
+
+    fun setFavorite(symbol: String, favorite: Boolean) = repository.setFavorite(symbol, favorite)
+
+    fun setNotificationsEnabled(enabled: Boolean) = repository.setNotificationsEnabled(enabled)
+
+    fun setTimeZone(timeZoneId: String) = repository.setTimeZone(timeZoneId)
+
+    fun setColorTheme(theme: AppColorTheme) = repository.setColorTheme(theme)
+
+    fun setAssetListStyle(style: AssetListStyle) = repository.setAssetListStyle(style)
+
+    fun setNetworkEnabled(
+        blockchain: Blockchain,
+        enabled: Boolean,
+        onComplete: (Result<Unit>) -> Unit = {},
+    ) {
+        viewModelScope.launch { onComplete(repository.setNetworkEnabled(blockchain, enabled)) }
+    }
+
+    fun revealWalletSecret() = repository.revealWalletSecret()
+
+    fun revealPrivateKeys() = repository.revealPrivateKeys()
+
+    val isP2PBoardConfigured: Boolean
+        get() = repository.isP2PBoardConfigured
+
+    fun loadP2PListings(
+        onComplete: (Result<List<io.noriskservis.wpayin.wallet.data.P2PListing>>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onComplete(repository.loadP2PListings())
+        }
+    }
+
+    fun createP2POffer(
+        sellAssetId: String,
+        receiveTokenAddress: String,
+        receiveTokenSymbol: String,
+        receiveTokenDecimals: Int,
+        sellAmount: String,
+        receiveAmount: String,
+        validForSeconds: Long,
+        onComplete: (Result<String>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onComplete(
+                repository.createP2POffer(
+                    sellAssetId = sellAssetId,
+                    receiveTokenAddress = receiveTokenAddress,
+                    receiveTokenSymbol = receiveTokenSymbol,
+                    receiveTokenDecimals = receiveTokenDecimals,
+                    sellAmount = sellAmount,
+                    receiveAmount = receiveAmount,
+                    validForSeconds = validForSeconds,
+                ),
+            )
+        }
+    }
+
+    fun prepareP2PAccept(
+        payload: String,
+        onComplete: (Result<io.noriskservis.wpayin.wallet.data.P2PAcceptPlan>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onComplete(repository.prepareP2PAccept(payload))
+        }
+    }
+
+    fun executeP2PAccept(
+        plan: io.noriskservis.wpayin.wallet.data.P2PAcceptPlan,
+        onComplete: (Result<WalletTransaction>) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onComplete(repository.executeP2PAccept(plan))
+        }
+    }
+
+    fun addSavedAddress(name: String, address: String): Result<SavedAddress> =
+        repository.addSavedAddress(name, address)
+
+    fun removeSavedAddress(id: String) = repository.removeSavedAddress(id)
 
     fun clearError() = repository.clearError()
 
     fun unlockSession() {
-        backgroundedAtNanos = null
         mutableSessionUnlocked.value = true
     }
 
@@ -124,13 +232,19 @@ class MainViewModel(
     }
 
     fun onAppBackgrounded() {
-        backgroundedAtNanos = System.nanoTime()
+        backgroundedAtElapsedRealtime = SystemClock.elapsedRealtime()
+        if (state.value.settings.autoLockDuration == AutoLockDuration.IMMEDIATELY) {
+            lockSession()
+        }
     }
 
     fun onAppForegrounded() {
-        val backgroundedAt = backgroundedAtNanos ?: return
-        backgroundedAtNanos = null
-        if (System.nanoTime() - backgroundedAt >= AUTO_LOCK_AFTER_NANOS) lockSession()
+        val backgroundedAt = backgroundedAtElapsedRealtime ?: return
+        backgroundedAtElapsedRealtime = null
+        val timeout = state.value.settings.autoLockDuration.timeoutMillis ?: return
+        if (SystemClock.elapsedRealtime() - backgroundedAt >= timeout) {
+            lockSession()
+        }
     }
 
     fun deleteWallet() {
@@ -144,9 +258,5 @@ class MainViewModel(
             require(modelClass.isAssignableFrom(MainViewModel::class.java))
             return MainViewModel(repository) as T
         }
-    }
-
-    companion object {
-        private const val AUTO_LOCK_AFTER_NANOS = 5L * 60L * 1_000_000_000L
     }
 }

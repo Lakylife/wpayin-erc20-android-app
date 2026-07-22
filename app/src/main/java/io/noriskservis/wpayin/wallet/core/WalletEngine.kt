@@ -21,7 +21,27 @@ interface WalletEngine {
 
     fun deriveEvmAddress(privateKey: String): String
 
+    /** Exports per-network private keys only after the UI has authenticated the user. */
+    fun exportPrivateKeys(
+        walletKind: WalletKind,
+        walletSecret: String,
+        blockchains: Set<Blockchain>,
+    ): Map<Blockchain, String>
+
     fun validateAddress(blockchain: Blockchain, address: String): Boolean
+
+    /** keccak-256 (EVM variant), used for EIP-712 hashing. */
+    fun keccak256(data: ByteArray): ByteArray
+
+    /**
+     * Signs a 32-byte digest with the wallet's EVM secp256k1 key.
+     * Returns 65 bytes: r (32) ‖ s (32) ‖ recovery id (0/1).
+     */
+    fun signEvmDigest(
+        walletKind: WalletKind,
+        walletSecret: String,
+        digest: ByteArray,
+    ): ByteArray
 
     /** Returns a 0x-prefixed raw signed EVM transaction. */
     fun signEvmTransaction(

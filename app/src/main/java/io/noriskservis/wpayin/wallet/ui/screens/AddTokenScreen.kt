@@ -26,9 +26,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.noriskservis.wpayin.wallet.R
 import io.noriskservis.wpayin.wallet.data.WalletState
 import io.noriskservis.wpayin.wallet.model.Blockchain
 import io.noriskservis.wpayin.wallet.model.KnownToken
@@ -65,7 +68,7 @@ fun AddTokenScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            ScreenHeader(title = "Add Custom Token", onBack = onBack)
+            ScreenHeader(title = stringResource(R.string.token_add_title), onBack = onBack)
             androidx.compose.foundation.lazy.LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -73,7 +76,7 @@ fun AddTokenScreen(
             ) {
                 item {
                     Text(
-                        "Select the exact network where the token contract is deployed.",
+                        stringResource(R.string.token_network_hint),
                         color = TextSecondary,
                     )
                     Row(
@@ -106,9 +109,9 @@ fun AddTokenScreen(
                             contractAddress = it.trim()
                             message = null
                         },
-                        label = { Text("Token contract") },
+                        label = { Text(stringResource(R.string.token_contract)) },
                         placeholder = { Text("0x…") },
-                        supportingText = { Text("Metadata and bytecode are verified directly through the selected network RPC.") },
+                        supportingText = { Text(stringResource(R.string.token_contract_hint)) },
                         singleLine = true,
                         shape = LargeShape,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -130,9 +133,9 @@ fun AddTokenScreen(
                             .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.28f), LargeShape)
                             .padding(16.dp),
                     ) {
-                        Text("Token safety", fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.token_safety), fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Anyone can deploy a token with a misleading name or symbol. Verify the contract using the issuer’s official source before adding it.",
+                            stringResource(R.string.token_safety_message),
                             color = TextSecondary,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -144,8 +147,9 @@ fun AddTokenScreen(
                 }
 
                 item {
+                    val resources = LocalResources.current
                     PrimaryButton(
-                        title = if (isLoading) "Verifying Contract…" else "Verify & Add Token",
+                        title = stringResource(if (isLoading) R.string.token_verifying else R.string.token_verify_add),
                         enabled = contractAddress.isNotBlank() && !isLoading,
                         onClick = {
                             isLoading = true
@@ -155,12 +159,17 @@ fun AddTokenScreen(
                                 result.fold(
                                     onSuccess = { token ->
                                         isError = false
-                                        message = "Added ${token.name} (${token.symbol}) with ${token.decimals} decimals."
+                                        message = resources.getString(
+                                            R.string.token_added,
+                                            token.name,
+                                            token.symbol,
+                                            token.decimals,
+                                        )
                                         contractAddress = ""
                                     },
                                     onFailure = { error ->
                                         isError = true
-                                        message = error.message ?: "Unable to verify this token"
+                                        message = error.message ?: resources.getString(R.string.token_verify_failed)
                                     },
                                 )
                             }
@@ -169,7 +178,7 @@ fun AddTokenScreen(
                 }
 
                 if (state.customTokens.isNotEmpty()) {
-                    item { Text("Custom Tokens", style = MaterialTheme.typography.headlineSmall) }
+                    item { Text(stringResource(R.string.token_custom_tokens), style = MaterialTheme.typography.headlineSmall) }
                     items(state.customTokens.size) { index ->
                         val token = state.customTokens[index]
                         Row(
@@ -192,7 +201,7 @@ fun AddTokenScreen(
                                 )
                             }
                             Text(
-                                "Remove",
+                                stringResource(R.string.token_remove),
                                 color = MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.clickable { onRemove(token) }.padding(6.dp),

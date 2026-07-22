@@ -13,7 +13,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.noriskservis.wpayin.wallet.R
 import io.noriskservis.wpayin.wallet.ui.components.LoadingScreen
 import io.noriskservis.wpayin.wallet.ui.screens.CreateWalletScreen
 import io.noriskservis.wpayin.wallet.ui.screens.ImportWalletScreen
@@ -22,10 +24,23 @@ import io.noriskservis.wpayin.wallet.ui.screens.OnboardingScreen
 import io.noriskservis.wpayin.wallet.ui.screens.ReceiveScreen
 import io.noriskservis.wpayin.wallet.ui.screens.SendScreen
 import io.noriskservis.wpayin.wallet.ui.screens.AddTokenScreen
+import io.noriskservis.wpayin.wallet.ui.screens.AllAssetsScreen
+import io.noriskservis.wpayin.wallet.ui.screens.AssetDetailScreen
+import io.noriskservis.wpayin.wallet.ui.screens.P2PScreen
 import io.noriskservis.wpayin.wallet.ui.screens.WelcomeScreen
 import io.noriskservis.wpayin.wallet.ui.screens.AppLockScreen
 
-private enum class AppRoute { ROOT, CREATE, IMPORT, RECEIVE, SEND, ADD_TOKEN }
+private enum class AppRoute {
+    ROOT,
+    CREATE,
+    IMPORT,
+    RECEIVE,
+    SEND,
+    ADD_TOKEN,
+    ALL_ASSETS,
+    ASSET_DETAIL,
+    P2P,
+}
 
 @Composable
 fun WpayinWalletApp(
@@ -38,6 +53,9 @@ fun WpayinWalletApp(
     val sessionUnlocked by viewModel.sessionUnlocked.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     var route by rememberSaveable { mutableStateOf(AppRoute.ROOT) }
+    var selectedAssetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var initialSwapAssetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var rootTab by rememberSaveable { mutableStateOf(0) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -100,7 +118,14 @@ fun WpayinWalletApp(
             if (wallet == null) {
                 route = AppRoute.ROOT
             } else {
-                ReceiveScreen(wallet = wallet, onBack = { route = AppRoute.ROOT })
+                ReceiveScreen(
+                    wallet = wallet,
+                    initialAssetId = selectedAssetId,
+                    onBack = {
+                        selectedAssetId = null
+                        route = AppRoute.ROOT
+                    },
+                )
             }
         }
         AppRoute.SEND -> {
@@ -110,11 +135,20 @@ fun WpayinWalletApp(
             } else {
                 SendScreen(
                     state = state,
+                    initialAssetId = selectedAssetId,
                     onPrepare = viewModel::prepareTransfer,
                     onAuthenticate = authenticateForSigning,
                     onSend = viewModel::sendTransfer,
-                    onBack = { route = AppRoute.ROOT },
-                    onFinished = { route = AppRoute.ROOT },
+                    onAddSavedAddress = viewModel::addSavedAddress,
+                    onRemoveSavedAddress = viewModel::removeSavedAddress,
+                    onBack = {
+                        selectedAssetId = null
+                        route = AppRoute.ROOT
+                    },
+                    onFinished = {
+                        selectedAssetId = null
+                        route = AppRoute.ROOT
+                    },
                 )
             }
         }
@@ -123,6 +157,53 @@ fun WpayinWalletApp(
             onAdd = viewModel::addCustomToken,
             onRemove = viewModel::removeCustomToken,
             onBack = { route = AppRoute.ROOT },
+        )
+        AppRoute.ALL_ASSETS -> AllAssetsScreen(
+            state = state,
+            onAddToken = { route = AppRoute.ADD_TOKEN },
+            onOpenAsset = { asset ->
+                selectedAssetId = asset.id
+                route = AppRoute.ASSET_DETAIL
+            },
+            onToggleFavorite = viewModel::setFavorite,
+            onBack = { route = AppRoute.ROOT },
+        )
+        AppRoute.ASSET_DETAIL -> {
+            val asset = state.wallet?.assets?.firstOrNull { it.id == selectedAssetId }
+            if (asset == null) {
+                route = AppRoute.ROOT
+            } else {
+                AssetDetailScreen(
+                    state = state,
+                    asset = asset,
+                    isFavorite = asset.symbol.uppercase() in state.settings.favoriteSymbols,
+                    onToggleFavorite = {
+                        viewModel.setFavorite(
+                            asset.symbol,
+                            asset.symbol.uppercase() !in state.settings.favoriteSymbols,
+                        )
+                    },
+                    onSend = { route = AppRoute.SEND },
+                    onReceive = { route = AppRoute.RECEIVE },
+                    onSwap = {
+                        initialSwapAssetId = asset.id
+                        selectedAssetId = null
+                        rootTab = 1
+                        route = AppRoute.ROOT
+                    },
+                    onBack = { route = AppRoute.ROOT },
+                )
+            }
+        }
+        AppRoute.P2P -> P2PScreen(
+            state = state,
+            onBack = { route = AppRoute.ROOT },
+            boardConfigured = viewModel.isP2PBoardConfigured,
+            onLoadListings = viewModel::loadP2PListings,
+            onPrepareAccept = viewModel::prepareP2PAccept,
+            onAuthenticate = authenticateForSigning,
+            onExecuteAccept = viewModel::executeP2PAccept,
+            onCreateOffer = viewModel::createP2POffer,
         )
         AppRoute.ROOT -> {
             val wallet = state.wallet
@@ -137,11 +218,58 @@ fun WpayinWalletApp(
                     state = state,
                     onRefresh = viewModel::refresh,
                     onToggleBalances = viewModel::setBalancesHidden,
-                    onReceive = { route = AppRoute.RECEIVE },
-                    onSend = { route = AppRoute.SEND },
+                    onReceive = {
+                        selectedAssetId = null
+                        route = AppRoute.RECEIVE
+                    },
+                    onSend = {
+                        selectedAssetId = null
+                        route = AppRoute.SEND
+                    },
                     onAddToken = { route = AppRoute.ADD_TOKEN },
                     onLockWallet = viewModel::lockSession,
+                    onSetAutoLock = viewModel::setAutoLockDuration,
                     onDeleteWallet = viewModel::deleteWallet,
+                    onNetworkEnabled = { blockchain, enabled ->
+                        viewModel.setNetworkEnabled(blockchain, enabled)
+                    },
+                    onPrepareExchange = viewModel::prepareExchange,
+                    onAuthenticateExchange = authenticateForSigning,
+                    onExecuteExchange = viewModel::executeExchange,
+                    onOpenP2P = { route = AppRoute.P2P },
+                    onOpenAllAssets = { route = AppRoute.ALL_ASSETS },
+                    onOpenAsset = { asset ->
+                        selectedAssetId = asset.id
+                        route = AppRoute.ASSET_DETAIL
+                    },
+                    onToggleFavorite = viewModel::setFavorite,
+                    onSetCurrency = viewModel::setCurrency,
+                    onSetNotifications = viewModel::setNotificationsEnabled,
+                    onSetTimeZone = viewModel::setTimeZone,
+                    onSetColorTheme = viewModel::setColorTheme,
+                    onSetAssetListStyle = viewModel::setAssetListStyle,
+                    initialSwapAssetId = initialSwapAssetId,
+                    initialTab = rootTab,
+                    onInitialNavigationConsumed = {
+                        initialSwapAssetId = null
+                        rootTab = 0
+                    },
+                    onRevealSecret = { done ->
+                        authenticateForSigning { authentication ->
+                            authentication.fold(
+                                onSuccess = { done(viewModel.revealWalletSecret()) },
+                                onFailure = { done(Result.failure(it)) },
+                            )
+                        }
+                    },
+                    onRevealPrivateKeys = { done ->
+                        authenticateForSigning { authentication ->
+                            authentication.fold(
+                                onSuccess = { done(viewModel.revealPrivateKeys()) },
+                                onFailure = { done(Result.failure(it)) },
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -150,10 +278,10 @@ fun WpayinWalletApp(
     if (state.errorMessage != null && state.wallet == null) {
         AlertDialog(
             onDismissRequest = viewModel::clearError,
-            title = { Text("Wallet operation failed") },
+            title = { Text(stringResource(R.string.app_wallet_operation_failed)) },
             text = { Text(state.errorMessage.orEmpty()) },
             confirmButton = {
-                TextButton(onClick = viewModel::clearError) { Text("OK") }
+                TextButton(onClick = viewModel::clearError) { Text(stringResource(R.string.common_ok)) }
             },
         )
     }

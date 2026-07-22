@@ -37,10 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.noriskservis.wpayin.wallet.R
 import io.noriskservis.wpayin.wallet.ui.components.LargeShape
 import io.noriskservis.wpayin.wallet.ui.components.MediumShape
 import io.noriskservis.wpayin.wallet.ui.components.PrimaryButton
@@ -73,11 +75,13 @@ fun CreateWalletScreen(
                 .navigationBarsPadding(),
         ) {
             ScreenHeader(
-                title = when (step) {
-                    0 -> "Create Wallet"
-                    1 -> "Recovery Phrase"
-                    else -> "Verify Backup"
-                },
+                title = stringResource(
+                    when (step) {
+                        0 -> R.string.create_title
+                        1 -> R.string.create_recovery_phrase
+                        else -> R.string.create_verify_backup
+                    },
+                ),
                 onBack = onBack,
             )
 
@@ -101,19 +105,22 @@ fun CreateWalletScreen(
                     mnemonic = mnemonic.orEmpty(),
                     onContinue = { step = 2 },
                 )
-                else -> VerifyStep(
-                    mnemonic = mnemonic.orEmpty(),
-                    isBusy = isBusy,
-                    error = localError,
-                    onConfirm = {
-                        isBusy = true
-                        localError = null
-                        onConfirm { success ->
-                            isBusy = false
-                            if (success) onFinished() else localError = "Wallet could not be created"
-                        }
-                    },
-                )
+                else -> {
+                    val createFailedMessage = stringResource(R.string.create_failed)
+                    VerifyStep(
+                        mnemonic = mnemonic.orEmpty(),
+                        isBusy = isBusy,
+                        error = localError,
+                        onConfirm = {
+                            isBusy = true
+                            localError = null
+                            onConfirm { success ->
+                                isBusy = false
+                                if (success) onFinished() else localError = createFailedMessage
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -141,13 +148,13 @@ private fun TermsStep(
             Icon(Icons.Rounded.Security, contentDescription = null, tint = Indigo)
         }
         Text(
-            "You control this wallet",
+            stringResource(R.string.create_you_control),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            "Wpayin cannot recover your recovery phrase. Anyone who knows it can move every asset in this wallet.",
+            stringResource(R.string.create_you_control_message),
             color = TextSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
@@ -160,9 +167,9 @@ private fun TermsStep(
                 .border(1.dp, SurfaceBorder, LargeShape)
                 .padding(18.dp),
         ) {
-            SafetyLine("Write all words down in the exact order")
-            SafetyLine("Keep the backup offline and private")
-            SafetyLine("Never enter it into a website or send it to support")
+            SafetyLine(stringResource(R.string.create_safety_1))
+            SafetyLine(stringResource(R.string.create_safety_2))
+            SafetyLine(stringResource(R.string.create_safety_3))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
@@ -170,11 +177,11 @@ private fun TermsStep(
                 onCheckedChange = onAcceptedChange,
                 colors = CheckboxDefaults.colors(checkedColor = Indigo),
             )
-            Text("I understand that losing the phrase means losing access to the wallet")
+            Text(stringResource(R.string.create_accept))
         }
         Spacer(Modifier.weight(1f))
         PrimaryButton(
-            title = if (isBusy) "Generating…" else "Generate Recovery Phrase",
+            title = stringResource(if (isBusy) R.string.create_generating else R.string.create_generate),
             onClick = onContinue,
             enabled = accepted && !isBusy,
         )
@@ -206,7 +213,7 @@ private fun BackupStep(mnemonic: String, onContinue: () -> Unit) {
         ) {
             Icon(Icons.Rounded.ContentCopy, contentDescription = null, tint = Warning)
             Text(
-                "Write these words on paper. Screenshots and clipboard copying are blocked to reduce accidental exposure.",
+                stringResource(R.string.create_write_down_warning),
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -236,7 +243,7 @@ private fun BackupStep(mnemonic: String, onContinue: () -> Unit) {
             }
         }
         PrimaryButton(
-            title = "I Have Written It Down",
+            title = stringResource(R.string.create_written_down),
             onClick = onContinue,
             enabled = words.size >= 12,
         )
@@ -264,7 +271,7 @@ private fun VerifyStep(
         modifier = Modifier.fillMaxSize().padding(22.dp),
     ) {
         Text(
-            "Enter the requested words to confirm that your offline backup is complete.",
+            stringResource(R.string.create_verify_hint),
             color = TextSecondary,
             style = MaterialTheme.typography.bodyLarge,
         )
@@ -272,7 +279,7 @@ private fun VerifyStep(
             OutlinedTextField(
                 value = answers[index].orEmpty(),
                 onValueChange = { value -> answers = answers + (index to value) },
-                label = { Text("Word #${index + 1}") },
+                label = { Text(stringResource(R.string.create_word_number, index + 1)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                 shape = MediumShape,
@@ -282,7 +289,7 @@ private fun VerifyStep(
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.weight(1f))
         PrimaryButton(
-            title = if (isBusy) "Securing Wallet…" else "Create Wallet",
+            title = stringResource(if (isBusy) R.string.create_securing else R.string.create_title),
             onClick = onConfirm,
             enabled = valid && !isBusy,
         )

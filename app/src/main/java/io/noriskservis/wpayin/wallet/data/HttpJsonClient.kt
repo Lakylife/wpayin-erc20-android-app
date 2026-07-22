@@ -35,7 +35,7 @@ class HttpJsonClient {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 10_000
-            readTimeout = 15_000
+            readTimeout = 30_000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", "WpayinWallet-Android/1.0")
             headers.forEach(::setRequestProperty)

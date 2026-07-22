@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Base64
+import kotlinx.coroutines.delay
 
 class RpcService(
     private val client: HttpJsonClient = HttpJsonClient(),
@@ -37,6 +38,34 @@ class RpcService(
             ).requiredResultString()
         }
         return hexQuantity(result).toBigDecimal().movePointLeft(token.decimals).toDouble()
+    }
+
+    suspend fun gasPriceWei(blockchain: Blockchain): BigInteger {
+        require(blockchain.isEvm) { "Gas price requires an EVM network" }
+        val result = withRpcFailover(blockchain) { rpcUrl ->
+            client.post(rpcUrl, jsonRpc("eth_gasPrice", JSONArray())).requiredResultString()
+        }
+        return hexQuantity(result)
+    }
+
+    /** Generic read-only contract call; optional `from` lets callers dry-run a fill. */
+    suspend fun ethCall(
+        blockchain: Blockchain,
+        to: String,
+        dataHex: String,
+        from: String? = null,
+    ): String {
+        require(blockchain.isEvm && isEvmAddress(to)) { "Invalid contract call target" }
+        require(dataHex.startsWith("0x")) { "Invalid contract call data" }
+        if (from != null) require(isEvmAddress(from)) { "Invalid contract call sender" }
+        return withRpcFailover(blockchain) { rpcUrl ->
+            val call = JSONObject().put("to", to.lowercase()).put("data", dataHex)
+            if (from != null) call.put("from", from)
+            client.post(
+                rpcUrl,
+                jsonRpc("eth_call", JSONArray().put(call).put("latest")),
+            ).requiredResultString()
+        }
     }
 
     suspend fun erc20Metadata(blockchain: Blockchain, contractAddress: String): KnownToken {
@@ -152,6 +181,142 @@ class RpcService(
         }
         check(transactionHashPattern.matches(hash)) { "RPC returned an invalid transaction hash" }
         return hash
+    }
+
+    suspend fun planEvmContractCall(
+        blockchain: Blockchain,
+        from: String,
+        transactionTo: String,
+        dataHex: String,
+        valueHex: String,
+        symbol: String,
+        amount: String,
+        amountAtomic: BigInteger,
+        assetContractAddress: String?,
+        recipient: String,
+    ): EvmTransferDraft {
+        require(blockchain.isEvm) { "Contract calls require an EVM network" }
+        require(isEvmAddress(from)) { "Invalid sender address" }
+        require(isEvmAddress(transactionTo)) { "Invalid contract address" }
+        require(isEvmAddress(recipient)) { "Invalid destination address" }
+        require(dataHexPattern.matches(dataHex) && dataHex.length <= MAX_CALL_DATA_HEX_LENGTH) {
+            "Invalid contract call data"
+        }
+        val value = hexQuantity(valueHex)
+        require(value.signum() >= 0 && value.bitLength() <= 256) { "Invalid contract call value" }
+        require(amountAtomic.signum() >= 0 && amountAtomic.bitLength() <= 256) { "Invalid source amount" }
+        if (assetContractAddress != null) require(isEvmAddress(assetContractAddress)) {
+            "Invalid source token contract"
+        }
+
+        val normalizedValue = value.toHexQuantity()
+        val (nonce, gasPrice, gasLimit) = withRpcFailover(blockchain) { rpcUrl ->
+            val nonce = client.post(
+                rpcUrl,
+                jsonRpc("eth_getTransactionCount", JSONArray().put(from).put("pending")),
+            ).requiredResultString().let(::hexQuantity)
+            val gasPrice = client.post(
+                rpcUrl,
+                jsonRpc("eth_gasPrice", JSONArray()),
+            ).requiredResultString().let(::hexQuantity)
+            val transaction = JSONObject()
+                .put("from", from)
+                .put("to", transactionTo)
+                .put("value", normalizedValue)
+                .put("data", dataHex)
+            val estimatedGas = client.post(
+                rpcUrl,
+                jsonRpc("eth_estimateGas", JSONArray().put(transaction)),
+            ).requiredResultString().let(::hexQuantity)
+            val bufferedGas = estimatedGas.multiply(BigInteger.valueOf(120)).add(BigInteger.valueOf(99))
+                .divide(BigInteger.valueOf(100))
+            Triple(nonce, gasPrice, bufferedGas)
+        }
+
+        return EvmTransferDraft(
+            blockchain = blockchain,
+            from = from,
+            to = recipient,
+            symbol = symbol,
+            amount = amount,
+            amountAtomic = amountAtomic,
+            contractAddress = assetContractAddress,
+            transactionTo = transactionTo,
+            valueHex = normalizedValue,
+            dataHex = dataHex,
+            nonce = nonce,
+            gasLimit = gasLimit,
+            gasPriceWei = gasPrice,
+            isGenericContractCall = true,
+        )
+    }
+
+    suspend fun erc20Allowance(
+        blockchain: Blockchain,
+        tokenContract: String,
+        owner: String,
+        spender: String,
+    ): BigInteger {
+        require(blockchain.isEvm && isEvmAddress(tokenContract) && isEvmAddress(owner) && isEvmAddress(spender)) {
+            "Invalid ERC-20 allowance request"
+        }
+        val result = withRpcFailover(blockchain) { rpcUrl ->
+            val call = JSONObject()
+                .put("to", tokenContract)
+                .put("data", erc20AllowanceData(owner, spender))
+            client.post(
+                rpcUrl,
+                jsonRpc("eth_call", JSONArray().put(call).put("latest")),
+            ).requiredResultString()
+        }
+        return hexQuantity(result)
+    }
+
+    suspend fun planErc20Approval(
+        blockchain: Blockchain,
+        from: String,
+        tokenContract: String,
+        spender: String,
+        amountAtomic: BigInteger,
+        symbol: String,
+    ): EvmTransferDraft = planEvmContractCall(
+        blockchain = blockchain,
+        from = from,
+        transactionTo = tokenContract,
+        dataHex = erc20ApproveData(spender, amountAtomic),
+        valueHex = "0x0",
+        symbol = symbol,
+        amount = "0",
+        amountAtomic = amountAtomic,
+        assetContractAddress = null,
+        recipient = spender,
+    )
+
+    suspend fun waitForSuccessfulEvmReceipt(
+        blockchain: Blockchain,
+        transactionHash: String,
+        attempts: Int = 30,
+    ) {
+        require(transactionHashPattern.matches(transactionHash)) { "Invalid transaction hash" }
+        repeat(attempts) {
+            val receipt = withRpcFailover(blockchain) { rpcUrl ->
+                val response = client.post(
+                    rpcUrl,
+                    jsonRpc("eth_getTransactionReceipt", JSONArray().put(transactionHash)),
+                )
+                if (response.has("error")) {
+                    error(response.getJSONObject("error").optString("message", "Unable to check transaction"))
+                }
+                response.optJSONObject("result")
+            }
+            if (receipt != null) {
+                val status = receipt.optString("status")
+                check(status.equals("0x1", ignoreCase = true)) { "Token approval failed on-chain" }
+                return
+            }
+            delay(2_000)
+        }
+        error("Token approval is still pending; try the swap again after it confirms")
     }
 
     suspend fun planSolanaTransfer(
@@ -400,6 +565,23 @@ class RpcService(
             return "0xa9059cbb$addressWord$amountWord"
         }
 
+        fun erc20AllowanceData(owner: String, spender: String): String {
+            require(isEvmAddress(owner) && isEvmAddress(spender)) { "Invalid ERC-20 allowance addresses" }
+            val ownerWord = owner.trim().removePrefix("0x").lowercase().padStart(64, '0')
+            val spenderWord = spender.trim().removePrefix("0x").lowercase().padStart(64, '0')
+            return "0xdd62ed3e$ownerWord$spenderWord"
+        }
+
+        fun erc20ApproveData(spender: String, amountAtomic: BigInteger): String {
+            require(isEvmAddress(spender)) { "Invalid ERC-20 spender address" }
+            require(amountAtomic.signum() >= 0 && amountAtomic.bitLength() <= 256) {
+                "Invalid ERC-20 approval amount"
+            }
+            val spenderWord = spender.trim().removePrefix("0x").lowercase().padStart(64, '0')
+            val amountWord = amountAtomic.toString(16).padStart(64, '0')
+            return "0x095ea7b3$spenderWord$amountWord"
+        }
+
         fun atomicAmount(amount: String, decimals: Int): BigInteger {
             require(decimals in 0..255) { "Invalid token decimals" }
             val decimal = amount.trim().toBigDecimalOrNull() ?: error("Invalid transfer amount")
@@ -459,5 +641,8 @@ class RpcService(
         }
 
         private fun BigInteger.toHexQuantity(): String = "0x${toString(16)}"
+
+        private val dataHexPattern = Regex("^0x(?:[0-9a-fA-F]{2})*$")
+        private const val MAX_CALL_DATA_HEX_LENGTH = 262_146
     }
 }

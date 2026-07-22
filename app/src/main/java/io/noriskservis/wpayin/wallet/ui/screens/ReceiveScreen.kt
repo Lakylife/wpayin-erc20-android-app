@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -47,13 +48,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import io.noriskservis.wpayin.wallet.R
 import io.noriskservis.wpayin.wallet.model.Asset
 import io.noriskservis.wpayin.wallet.model.Blockchain
 import io.noriskservis.wpayin.wallet.model.WalletAccount
@@ -76,13 +81,22 @@ import io.noriskservis.wpayin.wallet.ui.theme.Warning
 import java.util.Locale
 
 @Composable
-fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
+fun ReceiveScreen(
+    wallet: WalletSnapshot,
+    initialAssetId: String? = null,
+    onBack: () -> Unit,
+) {
     val availableAssets = wallet.assets
         .filter { asset -> wallet.account(asset.blockchain) != null }
         .sortedWith(compareBy({ it.symbol.uppercase() }, { it.blockchain.ordinal }))
     val symbols = availableAssets.map { it.symbol.uppercase() }.distinct()
-    var selectedSymbol by remember(availableAssets) { mutableStateOf<String?>(null) }
-    var selectedBlockchain by remember(availableAssets) { mutableStateOf<Blockchain?>(null) }
+    val initialAsset = availableAssets.firstOrNull { it.id == initialAssetId }
+    var selectedSymbol by remember(availableAssets, initialAssetId) {
+        mutableStateOf(initialAsset?.symbol?.uppercase())
+    }
+    var selectedBlockchain by remember(availableAssets, initialAssetId) {
+        mutableStateOf(initialAsset?.blockchain)
+    }
     var showDetails by remember { mutableStateOf(false) }
     var showAssetPicker by remember { mutableStateOf(false) }
     var showNetworkPicker by remember { mutableStateOf(false) }
@@ -91,6 +105,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
     val selectedAsset = selectedNetworks.firstOrNull { it.blockchain == selectedBlockchain }
     val account = selectedAsset?.let { wallet.account(it.blockchain) }
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     WpayinBackground {
         Column(
@@ -100,7 +115,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                 .navigationBarsPadding(),
         ) {
             ScreenHeader(
-                title = if (showDetails) "Receive Crypto" else "Deposit",
+                title = stringResource(if (showDetails) R.string.receive_crypto else R.string.receive_deposit),
                 onBack = {
                     if (showDetails) {
                         showDetails = false
@@ -118,15 +133,17 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                     addressCopied = addressCopied,
                     onCopy = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Wpayin address", account.address))
+                        clipboard.setPrimaryClip(
+                            ClipData.newPlainText(resources.getString(R.string.receive_address), account.address),
+                        )
                         addressCopied = true
                     },
                     onChangeNetwork = { showNetworkPicker = true },
                     onRequestPayment = {
-                        shareReceiveDetails(context, selectedAsset, account, paymentRequest = true)
+                        shareReceiveDetails(context, resources, selectedAsset, account, paymentRequest = true)
                     },
                     onShare = {
-                        shareReceiveDetails(context, selectedAsset, account, paymentRequest = false)
+                        shareReceiveDetails(context, resources, selectedAsset, account, paymentRequest = false)
                     },
                 )
             } else {
@@ -155,14 +172,23 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                                     modifier = Modifier.size(22.dp),
                                 )
                             }
-                            Text("Receive Crypto", fontSize = 24.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold)
-                            Text("Select Asset & Network", color = TextSecondary, fontSize = 14.sp)
+                            Text(
+                                stringResource(R.string.receive_crypto),
+                                fontSize = 24.sp,
+                                lineHeight = 27.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                stringResource(R.string.receive_select_asset_network),
+                                color = TextSecondary,
+                                fontSize = 14.sp,
+                            )
                         }
                     }
 
                     item {
                         ReceiveSelectionCard(
-                            title = "Select Asset",
+                            title = stringResource(R.string.send_select_asset),
                             isComplete = selectedSymbol != null,
                         ) {
                             Row(
@@ -202,7 +228,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                                         Text("$", color = Indigo, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                                     }
                                     Text(
-                                        "Select Token",
+                                        stringResource(R.string.send_select_token),
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         modifier = Modifier.padding(start = 13.dp).weight(1f),
@@ -220,7 +246,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                     if (selectedSymbol != null) {
                         item {
                             ReceiveSelectionCard(
-                                title = "Select Network",
+                                title = stringResource(R.string.send_select_network),
                                 isComplete = selectedAsset != null,
                             ) {
                                 Row(
@@ -260,9 +286,13 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                                             Text("◎", color = Indigo, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                                         }
                                         Column(Modifier.padding(start = 13.dp).weight(1f)) {
-                                            Text("Select Network", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                             Text(
-                                                "${selectedNetworks.size} networks available",
+                                                stringResource(R.string.send_select_network),
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                            Text(
+                                                stringResource(R.string.send_networks_available, selectedNetworks.size),
                                                 color = TextSecondary,
                                                 fontSize = 12.sp,
                                             )
@@ -280,7 +310,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
 
                     item {
                         PrimaryButton(
-                            title = "Continue",
+                            title = stringResource(R.string.receive_continue),
                             enabled = selectedAsset != null && account != null,
                             onClick = { showDetails = true },
                         )
@@ -293,7 +323,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
     if (showAssetPicker) {
         AlertDialog(
             onDismissRequest = { showAssetPicker = false },
-            title = { Text("Select Asset") },
+            title = { Text(stringResource(R.string.send_select_asset)) },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -333,7 +363,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAssetPicker = false }) { Text("Close") }
+                TextButton(onClick = { showAssetPicker = false }) { Text(stringResource(R.string.common_close)) }
             },
         )
     }
@@ -341,7 +371,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
     if (showNetworkPicker) {
         AlertDialog(
             onDismissRequest = { showNetworkPicker = false },
-            title = { Text("Select Network") },
+            title = { Text(stringResource(R.string.send_select_network)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     selectedNetworks.forEach { asset ->
@@ -377,7 +407,7 @@ fun ReceiveScreen(wallet: WalletSnapshot, onBack: () -> Unit) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showNetworkPicker = false }) { Text("Close") }
+                TextButton(onClick = { showNetworkPicker = false }) { Text(stringResource(R.string.common_close)) }
             },
         )
     }
@@ -432,7 +462,7 @@ private fun ReceiveDetails(
                     )
                 }
                 Text(
-                    "Send funds to your ${asset.symbol} address",
+                    stringResource(R.string.receive_send_to_address, asset.symbol),
                     color = TextSecondary,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
@@ -451,7 +481,10 @@ private fun ReceiveDetails(
                 if (qrBitmap != null) {
                     Image(
                         bitmap = qrBitmap.asImageBitmap(),
-                        contentDescription = "${account.blockchain.displayName} address QR code",
+                        contentDescription = stringResource(
+                            R.string.receive_qr_content_description,
+                            account.blockchain.displayName,
+                        ),
                         modifier = Modifier.size(210.dp),
                     )
                     Box(
@@ -460,7 +493,7 @@ private fun ReceiveDetails(
                             .size(52.dp)
                             .background(Color.White, RoundedCornerShape(13.dp)),
                     ) {
-                        WpayinLogo(size = 40)
+                        WpayinLogo(size = 40, tint = Color.Black)
                     }
                 }
             }
@@ -475,7 +508,7 @@ private fun ReceiveDetails(
                     .border(1.dp, SurfaceBorder, RoundedCornerShape(20.dp))
                     .padding(18.dp),
             ) {
-                Text("Receive Address", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.receive_address), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         account.address,
@@ -494,7 +527,7 @@ private fun ReceiveDetails(
                     ) {
                         Icon(
                             if (addressCopied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
-                            contentDescription = "Copy address",
+                            contentDescription = stringResource(R.string.receive_copy_address),
                             tint = if (addressCopied) Success else Indigo,
                             modifier = Modifier.size(18.dp),
                         )
@@ -515,10 +548,9 @@ private fun ReceiveDetails(
             ) {
                 Text("⚠", color = Warning, fontSize = 19.sp)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Important", color = Warning, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.receive_important), color = Warning, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Only send ${asset.symbol} on ${asset.blockchain.displayName} network to this address. " +
-                            "Sending wrong tokens or using the wrong network may result in permanent loss.",
+                        stringResource(R.string.receive_warning, asset.symbol, asset.blockchain.displayName),
                         color = TextSecondary,
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
@@ -528,10 +560,10 @@ private fun ReceiveDetails(
         }
 
         item {
-            PrimaryButton(title = "Request payment", onClick = onRequestPayment)
+            PrimaryButton(title = stringResource(R.string.receive_request_payment), onClick = onRequestPayment)
         }
         item {
-            SecondaryButton(title = "Share address with sender", onClick = onShare)
+            SecondaryButton(title = stringResource(R.string.receive_share_address), onClick = onShare)
         }
     }
 }
@@ -567,26 +599,39 @@ private fun ReceiveSelectionCard(
 
 private fun shareReceiveDetails(
     context: Context,
+    resources: Resources,
     asset: Asset,
     account: WalletAccount,
     paymentRequest: Boolean,
 ) {
-    val prefix = if (paymentRequest) "Payment request" else "${asset.symbol} • ${asset.blockchain.displayName}"
-    val message = "$prefix\nReceive Address: ${account.address}\n\n" +
-        "Only send ${asset.symbol} on ${asset.blockchain.displayName} network to this address."
+    val prefix = if (paymentRequest) {
+        resources.getString(R.string.receive_payment_request)
+    } else {
+        "${asset.symbol} • ${asset.blockchain.displayName}"
+    }
+    val message = "$prefix\n${resources.getString(R.string.receive_address)}: ${account.address}\n\n" +
+        resources.getString(R.string.receive_warning, asset.symbol, asset.blockchain.displayName)
     context.startActivity(
         Intent.createChooser(
             Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, message)
             },
-            if (paymentRequest) "Request payment" else "Share address",
+            resources.getString(
+                if (paymentRequest) R.string.receive_request_payment else R.string.receive_share,
+            ),
         ),
     )
 }
 
 private fun generateQrCode(content: String, size: Int): Bitmap? = runCatching {
-    val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size)
+    val matrix = QRCodeWriter().encode(
+        content,
+        BarcodeFormat.QR_CODE,
+        size,
+        size,
+        mapOf(EncodeHintType.MARGIN to 0),
+    )
     Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).apply {
         for (x in 0 until size) {
             for (y in 0 until size) {

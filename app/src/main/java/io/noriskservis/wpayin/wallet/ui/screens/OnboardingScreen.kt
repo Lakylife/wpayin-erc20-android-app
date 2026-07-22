@@ -9,6 +9,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,8 +64,8 @@ import io.noriskservis.wpayin.wallet.ui.theme.Violet
 private data class OnboardingPage(
     val icon: ImageVector,
     val color: Color,
-    val title: String,
-    val message: String,
+    val title: Int,
+    val message: Int,
 )
 
 @Composable
@@ -75,20 +77,20 @@ fun OnboardingScreen(onComplete: () -> Unit) {
             OnboardingPage(
                 Icons.Rounded.Lock,
                 Indigo,
-                "Your keys, your wallet",
-                "Recovery phrases and private keys stay encrypted on this device. Wpayin never takes custody of your funds.",
+                R.string.onboarding_keys_title,
+                R.string.onboarding_keys_message,
             ),
             OnboardingPage(
                 Icons.Rounded.SwapHoriz,
                 Success,
-                "Trade across networks",
-                "Manage Bitcoin, Ethereum, Solana and the supported EVM networks from one clear interface.",
+                R.string.onboarding_trade_title,
+                R.string.onboarding_trade_message,
             ),
             OnboardingPage(
                 Icons.Rounded.Language,
                 Violet,
-                "Built for the open web",
-                "Receive assets, review transactions and connect to decentralized services without a bank account.",
+                R.string.onboarding_web_title,
+                R.string.onboarding_web_message,
             ),
         )
     }
@@ -114,7 +116,7 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         .padding(horizontal = 22.dp, vertical = 20.dp),
                 ) {
                     Text(
-                        "Step ${page + 1} of ${pages.size}",
+                        stringResource(R.string.onboarding_step, page + 1, pages.size),
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -142,19 +144,22 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                     }
 
                     PrimaryButton(
-                        title = if (page == pages.lastIndex) "Open Wpayin Wallet" else "Continue",
+                        title = stringResource(
+                            if (page == pages.lastIndex) R.string.onboarding_open_wallet else R.string.onboarding_continue,
+                        ),
                         onClick = {
                             if (page == pages.lastIndex) onComplete() else page += 1
                         },
                     )
                     AnimatedVisibility(page < pages.lastIndex) {
                         Text(
-                            "Skip",
+                            stringResource(R.string.onboarding_skip),
                             color = TextSecondary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 18.dp),
+                                .clickable(onClick = onComplete)
+                                .padding(top = 18.dp, bottom = 4.dp),
                         )
                     }
                 }
@@ -213,16 +218,16 @@ private fun OnboardingIntro(onContinue: () -> Unit) {
                     WpayinLogo(88)
                 }
             }
-            Text("Wpayin Wallet", fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.app_name), fontSize = 34.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             Text(
-                "Your gateway to decentralized finance",
+                stringResource(R.string.onboarding_tagline),
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.weight(1f))
-            PrimaryButton(title = "Get Started", onClick = onContinue)
+            PrimaryButton(title = stringResource(R.string.onboarding_get_started), onClick = onContinue)
         }
     }
 }
@@ -244,13 +249,13 @@ private fun OnboardingPageContent(page: OnboardingPage) {
         }
         Spacer(Modifier.height(36.dp))
         Text(
-            page.title,
+            stringResource(page.title),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            page.message,
+            stringResource(page.message),
             color = TextSecondary,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,

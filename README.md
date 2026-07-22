@@ -44,7 +44,7 @@ balances, public addresses, and transactions; it never contains wallet keys.
 
 - Android Studio Quail 2 (2026.1.2) or compatible
 - JDK 17 or newer
-- Android SDK Platform 37.0
+- Android SDK Platform 37.0 (`platforms;android-37.0`)
 - Android SDK Build Tools 36.0.0
 - Gradle 9.4.1 (included wrapper)
 - minSdk 26 / targetSdk 37

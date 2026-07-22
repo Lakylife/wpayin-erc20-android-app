@@ -13,14 +13,23 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import io.noriskservis.wpayin.wallet.R
+import io.noriskservis.wpayin.wallet.model.AppColorTheme
 
 val Ink = Color(0xFF070810)
 val InkRaised = Color(0xFF0E101A)
 val InkSurface = Color(0xFF161926)
 val InkLight = Color(0xFF202434)
-val Indigo = Color(0xFF718AF8)
-val IndigoDark = Color(0xFF5568D3)
-val Violet = Color(0xFF8B68F6)
+private data class AccentPalette(val primary: Color, val primaryDark: Color, val accent: Color)
+
+private var activeAccentPalette = AccentPalette(
+    primary = Color(0xFF718AF8),
+    primaryDark = Color(0xFF5568D3),
+    accent = Color(0xFF8B68F6),
+)
+
+val Indigo: Color get() = activeAccentPalette.primary
+val IndigoDark: Color get() = activeAccentPalette.primaryDark
+val Violet: Color get() = activeAccentPalette.accent
 val Success = Color(0xFF34D399)
 val Error = Color(0xFFF87171)
 val Warning = Color(0xFFFBBF24)
@@ -59,25 +68,56 @@ private val WpayinTypography = Typography(
     labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
 )
 
-private val WpayinColors = darkColorScheme(
-    primary = Indigo,
-    onPrimary = Color.White,
-    primaryContainer = Indigo.copy(alpha = 0.18f),
-    secondary = Violet,
-    background = Ink,
-    onBackground = TextPrimary,
-    surface = InkSurface,
-    onSurface = TextPrimary,
-    surfaceVariant = InkLight,
-    onSurfaceVariant = TextSecondary,
-    outline = SurfaceBorder,
-    error = Error,
-)
+fun AppColorTheme.primaryColor(): Color = when (this) {
+    AppColorTheme.INDIGO -> Color(0xFF718AF8)
+    AppColorTheme.EMERALD -> Color(0xFF34D399)
+    AppColorTheme.AMBER -> Color(0xFFF59E0B)
+    AppColorTheme.ROSE -> Color(0xFFFB7185)
+    AppColorTheme.SKY -> Color(0xFF38BDF8)
+}
+
+fun AppColorTheme.primaryDarkColor(): Color = when (this) {
+    AppColorTheme.INDIGO -> Color(0xFF5568D3)
+    AppColorTheme.EMERALD -> Color(0xFF109669)
+    AppColorTheme.AMBER -> Color(0xFFD97706)
+    AppColorTheme.ROSE -> Color(0xFFE1445E)
+    AppColorTheme.SKY -> Color(0xFF0EA5E9)
+}
+
+fun AppColorTheme.accentColor(): Color = when (this) {
+    AppColorTheme.INDIGO -> Color(0xFF8B68F6)
+    AppColorTheme.EMERALD -> Color(0xFF2DD4BF)
+    AppColorTheme.AMBER -> Color(0xFFF97316)
+    AppColorTheme.ROSE -> Color(0xFFF472B6)
+    AppColorTheme.SKY -> Color(0xFF22D3EE)
+}
 
 @Composable
-fun WpayinTheme(content: @Composable () -> Unit) {
+fun WpayinTheme(
+    appColorTheme: AppColorTheme = AppColorTheme.INDIGO,
+    content: @Composable () -> Unit,
+) {
+    activeAccentPalette = AccentPalette(
+        primary = appColorTheme.primaryColor(),
+        primaryDark = appColorTheme.primaryDarkColor(),
+        accent = appColorTheme.accentColor(),
+    )
+    val colors = darkColorScheme(
+        primary = Indigo,
+        onPrimary = Color.White,
+        primaryContainer = Indigo.copy(alpha = 0.18f),
+        secondary = Violet,
+        background = Ink,
+        onBackground = TextPrimary,
+        surface = InkSurface,
+        onSurface = TextPrimary,
+        surfaceVariant = InkLight,
+        onSurfaceVariant = TextSecondary,
+        outline = SurfaceBorder,
+        error = Error,
+    )
     MaterialTheme(
-        colorScheme = WpayinColors,
+        colorScheme = colors,
         typography = WpayinTypography,
     ) {
         CompositionLocalProvider(LocalContentColor provides TextPrimary, content = content)

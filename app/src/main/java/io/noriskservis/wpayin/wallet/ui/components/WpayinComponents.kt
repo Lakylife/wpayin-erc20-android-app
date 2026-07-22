@@ -42,8 +42,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -81,11 +83,12 @@ fun WpayinBackground(
 }
 
 @Composable
-fun WpayinLogo(size: Int = 80) {
+fun WpayinLogo(size: Int = 80, tint: Color? = null) {
     Image(
         painter = painterResource(R.drawable.wpayin_logo),
-        contentDescription = "Wpayin Wallet",
+        contentDescription = stringResource(R.string.app_name),
         contentScale = ContentScale.Fit,
+        colorFilter = tint?.let(ColorFilter::tint),
         modifier = Modifier.size(size.dp),
     )
 }
@@ -172,7 +175,7 @@ fun ScreenHeader(
                     .border(1.dp, SurfaceBorder, CircleShape)
                     .clickable(onClick = onBack),
             ) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
             }
             Spacer(Modifier.size(14.dp))
         }
@@ -231,7 +234,7 @@ fun LoadingScreen() {
                 modifier = Modifier.padding(top = 38.dp).scale(scale),
             )
             Text(
-                "Secure, Simple, Decentralized",
+                stringResource(R.string.secure_simple_decentralized),
                 color = TextSecondary,
                 fontSize = 16.sp,
                 modifier = Modifier.padding(top = 12.dp),
@@ -252,9 +255,9 @@ fun LoadingScreen() {
                         Icon(Icons.Rounded.Lock, contentDescription = null, tint = Indigo, modifier = Modifier.size(20.dp))
                     }
                     Column(Modifier.padding(start = 13.dp).weight(1f)) {
-                        Text("Syncing…", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.component_syncing), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Secure, Simple, Decentralized",
+                            stringResource(R.string.secure_simple_decentralized),
                             color = TextSecondary,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(top = 3.dp),
@@ -300,12 +303,12 @@ fun ProductionVariantNotice(modifier: Modifier = Modifier) {
         Icon(Icons.Rounded.Lock, contentDescription = null, tint = Indigo)
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                "Preview build",
+                stringResource(R.string.component_preview_build),
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
             )
             Text(
-                "Select the walletCore build variant and configure GitHub Packages before creating or importing a real wallet.",
+                stringResource(R.string.component_preview_build_message),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
             )

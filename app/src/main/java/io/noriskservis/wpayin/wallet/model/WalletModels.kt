@@ -45,6 +45,23 @@ enum class TransactionType { SEND, RECEIVE, SWAP, BRIDGE }
 
 enum class TransactionStatus { PENDING, CONFIRMED, FAILED }
 
+enum class AutoLockDuration(
+    val storageValue: String,
+    val timeoutMillis: Long?,
+) {
+    IMMEDIATELY("immediately", 0L),
+    AFTER_1_MINUTE("1min", 60_000L),
+    AFTER_5_MINUTES("5min", 5 * 60_000L),
+    AFTER_15_MINUTES("15min", 15 * 60_000L),
+    AFTER_1_HOUR("1hour", 60 * 60_000L),
+    NEVER("never", null);
+
+    companion object {
+        fun fromStorage(value: String?): AutoLockDuration =
+            entries.firstOrNull { it.storageValue == value } ?: AFTER_5_MINUTES
+    }
+}
+
 data class WalletTransaction(
     val hash: String,
     val blockchain: Blockchain,
@@ -84,6 +101,7 @@ data class EvmTransferDraft(
     val nonce: BigInteger,
     val gasLimit: BigInteger,
     val gasPriceWei: BigInteger,
+    val isGenericContractCall: Boolean = false,
     override val plannedAt: Instant = Instant.now(),
 ) : TransferDraft {
     val maximumFeeWei: BigInteger
@@ -94,6 +112,38 @@ data class EvmTransferDraft(
 
     override val maximumNetworkFee: Double
         get() = maximumFeeNative
+}
+
+data class ExchangeQuote(
+    val fromAssetId: String,
+    val toAssetId: String,
+    val fromBlockchain: Blockchain,
+    val toBlockchain: Blockchain,
+    val fromAddress: String,
+    val toAddress: String,
+    val fromAmount: String,
+    val fromAmountAtomic: BigInteger,
+    val toAmount: String,
+    val minimumToAmount: String,
+    val provider: String,
+    val estimatedDurationSeconds: Long,
+    val approvalAddress: String?,
+    val transactionTo: String,
+    val transactionDataHex: String,
+    val transactionValueHex: String,
+    val callDraft: EvmTransferDraft?,
+    val approvalDrafts: List<EvmTransferDraft> = emptyList(),
+    // Set for a Bitcoin source: the exact deposit spend LI.FI expects.
+    val bitcoinDraft: BitcoinTransferDraft? = null,
+    val requestedAt: Instant = Instant.now(),
+) {
+    val type: TransactionType
+        get() = if (fromBlockchain == toBlockchain) TransactionType.SWAP else TransactionType.BRIDGE
+
+    val maximumNetworkFee: Double
+        get() = (callDraft?.maximumNetworkFee ?: 0.0) +
+            approvalDrafts.sumOf(EvmTransferDraft::maximumNetworkFee) +
+            (bitcoinDraft?.maximumNetworkFee ?: 0.0)
 }
 
 data class SolanaTransferDraft(
@@ -144,4 +194,24 @@ data class AppSettings(
     val currencyCode: String = "USD",
     val languageTag: String = "system",
     val hideBalances: Boolean = false,
+    val autoLockDuration: AutoLockDuration = AutoLockDuration.AFTER_5_MINUTES,
+    val enabledNetworks: Set<Blockchain> = Blockchain.entries.toSet(),
+    val favoriteSymbols: Set<String> = emptySet(),
+    val notificationsEnabled: Boolean = false,
+    val timeZoneId: String = AUTOMATIC_TIME_ZONE_ID,
+    val colorTheme: AppColorTheme = AppColorTheme.INDIGO,
+    val assetListStyle: AssetListStyle = AssetListStyle.CARDS,
+)
+
+data class ExportedPrivateKey(
+    val blockchain: Blockchain,
+    val address: String,
+    val privateKey: String,
+)
+
+data class SavedAddress(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val address: String,
+    val createdAt: Instant = Instant.now(),
 )

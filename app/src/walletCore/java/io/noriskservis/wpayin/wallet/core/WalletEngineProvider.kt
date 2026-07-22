@@ -12,6 +12,7 @@ import wallet.core.java.AnySigner
 import wallet.core.jni.CoinType
 import wallet.core.jni.Curve
 import wallet.core.jni.HDWallet
+import wallet.core.jni.Hash
 import wallet.core.jni.Mnemonic
 import wallet.core.jni.PrivateKey
 import wallet.core.jni.proto.Ethereum
@@ -60,10 +61,62 @@ private class TrustWalletCoreEngine : WalletEngine {
         return CoinType.ETHEREUM.deriveAddress(PrivateKey(bytes))
     }
 
+    override fun exportPrivateKeys(
+        walletKind: WalletKind,
+        walletSecret: String,
+        blockchains: Set<Blockchain>,
+    ): Map<Blockchain, String> = when (walletKind) {
+        WalletKind.PRIVATE_KEY -> {
+            require(validatePrivateKey(walletSecret)) { "Invalid stored private key" }
+            mapOf(Blockchain.ETHEREUM to walletSecret.removePrefix("0x").let { "0x$it" })
+        }
+        WalletKind.MNEMONIC -> {
+            require(validateMnemonic(walletSecret)) { "Invalid stored recovery phrase" }
+            val wallet = HDWallet(walletSecret, "")
+            blockchains
+                .sortedBy(Blockchain::ordinal)
+                .associateWith { blockchain ->
+                    val keyBytes = wallet.getKeyForCoin(blockchain.walletCoreCoinType()).data()
+                    try {
+                        "0x" + keyBytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                    } finally {
+                        keyBytes.fill(0)
+                    }
+                }
+        }
+    }
+
     override fun validateAddress(blockchain: Blockchain, address: String): Boolean = runCatching {
         AnyAddress(address, blockchain.walletCoreCoinType())
         true
     }.getOrDefault(false)
+
+    override fun keccak256(data: ByteArray): ByteArray = Hash.keccak256(data)
+
+    override fun signEvmDigest(
+        walletKind: WalletKind,
+        walletSecret: String,
+        digest: ByteArray,
+    ): ByteArray {
+        require(digest.size == 32) { "EVM digests must be 32 bytes" }
+        val privateKeyBytes = when (walletKind) {
+            WalletKind.MNEMONIC -> {
+                require(validateMnemonic(walletSecret)) { "Invalid stored recovery phrase" }
+                HDWallet(walletSecret, "").getKeyForCoin(CoinType.ETHEREUM).data()
+            }
+            WalletKind.PRIVATE_KEY -> walletSecret.hexToBytesOrNull()
+                ?: error("Invalid stored private key")
+        }
+        try {
+            val signature = PrivateKey(privateKeyBytes).sign(digest, Curve.SECP256K1)
+            check(signature != null && signature.size == 65) {
+                "Wallet Core could not sign the digest"
+            }
+            return signature
+        } finally {
+            privateKeyBytes.fill(0)
+        }
+    }
 
     override fun signEvmTransaction(
         walletKind: WalletKind,
@@ -89,7 +142,12 @@ private class TrustWalletCoreEngine : WalletEngine {
                 gasPrice = draft.gasPriceWei.asWalletCoreBytes()
                 gasLimit = draft.gasLimit.asWalletCoreBytes()
                 transaction = Ethereum.Transaction.newBuilder().apply {
-                    if (draft.contractAddress == null) {
+                    if (draft.isGenericContractCall) {
+                        contractGeneric = Ethereum.Transaction.ContractGeneric.newBuilder().apply {
+                            amount = draft.valueHex.hexQuantityToBigInteger().asWalletCoreBytes()
+                            data = ByteString.copyFrom(draft.dataHex.hexDataToBytes())
+                        }.build()
+                    } else if (draft.contractAddress == null) {
                         transfer = Ethereum.Transaction.Transfer.newBuilder().apply {
                             amount = draft.amountAtomic.asWalletCoreBytes()
                         }.build()
@@ -200,6 +258,22 @@ private class TrustWalletCoreEngine : WalletEngine {
     private fun String.hexToBytesOrNull(expectedBytes: Int): ByteArray? {
         if (length != expectedBytes * 2 || any { it.digitToIntOrNull(16) == null }) return null
         return ByteArray(expectedBytes) { index -> substring(index * 2, index * 2 + 2).toInt(16).toByte() }
+    }
+
+    private fun String.hexDataToBytes(): ByteArray {
+        val normalized = removePrefix("0x")
+        require(normalized.length % 2 == 0 && normalized.all { it.digitToIntOrNull(16) != null }) {
+            "Invalid EVM call data"
+        }
+        return ByteArray(normalized.length / 2) { index ->
+            normalized.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        }
+    }
+
+    private fun String.hexQuantityToBigInteger(): BigInteger {
+        val normalized = removePrefix("0x").ifEmpty { "0" }
+        require(normalized.all { it.digitToIntOrNull(16) != null }) { "Invalid EVM value" }
+        return BigInteger(normalized, 16)
     }
 
     private fun Blockchain.walletCoreCoinType(): CoinType = when (this) {

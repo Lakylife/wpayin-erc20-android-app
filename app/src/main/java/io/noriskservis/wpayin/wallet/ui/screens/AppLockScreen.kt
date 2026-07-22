@@ -21,8 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.noriskservis.wpayin.wallet.R
 import io.noriskservis.wpayin.wallet.ui.components.PrimaryButton
 import io.noriskservis.wpayin.wallet.ui.components.WpayinBackground
 import io.noriskservis.wpayin.wallet.ui.components.WpayinLogo
@@ -59,12 +61,12 @@ fun AppLockScreen(
                 )
             }
             Text(
-                "Wallet locked",
+                stringResource(R.string.lock_title),
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(top = 22.dp),
             )
             Text(
-                "Authenticate to view balances, addresses, and transaction activity.",
+                stringResource(R.string.lock_message),
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 10.dp),
@@ -77,15 +79,16 @@ fun AppLockScreen(
                     modifier = Modifier.padding(top = 14.dp),
                 )
             }
+            val authFailedMessage = stringResource(R.string.auth_failed)
             PrimaryButton(
-                title = if (isAuthenticating) "Authenticating…" else "Unlock Wallet",
+                title = stringResource(if (isAuthenticating) R.string.lock_authenticating else R.string.lock_unlock),
                 enabled = !isAuthenticating,
                 onClick = {
                     isAuthenticating = true
                     errorMessage = null
                     onUnlock { result ->
                         isAuthenticating = false
-                        result.onFailure { errorMessage = it.message ?: "Authentication failed" }
+                        result.onFailure { errorMessage = it.message ?: authFailedMessage }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().padding(top = 30.dp),

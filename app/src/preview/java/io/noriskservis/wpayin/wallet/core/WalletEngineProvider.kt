@@ -24,7 +24,21 @@ private object PreviewWalletEngine : WalletEngine {
 
     override fun deriveEvmAddress(privateKey: String): String = unavailable()
 
+    override fun exportPrivateKeys(
+        walletKind: WalletKind,
+        walletSecret: String,
+        blockchains: Set<Blockchain>,
+    ): Map<Blockchain, String> = unavailable()
+
     override fun validateAddress(blockchain: Blockchain, address: String): Boolean = false
+
+    override fun keccak256(data: ByteArray): ByteArray = unavailable()
+
+    override fun signEvmDigest(
+        walletKind: WalletKind,
+        walletSecret: String,
+        digest: ByteArray,
+    ): ByteArray = unavailable()
 
     override fun signEvmTransaction(
         walletKind: WalletKind,

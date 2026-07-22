@@ -2,6 +2,7 @@ package io.noriskservis.wpayin.wallet.ui.screens
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,7 +30,11 @@ import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -49,12 +54,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.noriskservis.wpayin.wallet.R
 import io.noriskservis.wpayin.wallet.data.WalletState
 import io.noriskservis.wpayin.wallet.model.Asset
 import io.noriskservis.wpayin.wallet.model.BitcoinTransferDraft
@@ -63,6 +70,7 @@ import io.noriskservis.wpayin.wallet.model.EvmTransferDraft
 import io.noriskservis.wpayin.wallet.model.SolanaTransferDraft
 import io.noriskservis.wpayin.wallet.model.TransferDraft
 import io.noriskservis.wpayin.wallet.model.WalletTransaction
+import io.noriskservis.wpayin.wallet.model.SavedAddress
 import io.noriskservis.wpayin.wallet.ui.components.CryptoNetworkIcon
 import io.noriskservis.wpayin.wallet.ui.components.CryptoTokenIcon
 import io.noriskservis.wpayin.wallet.ui.components.LargeShape
@@ -76,15 +84,22 @@ import io.noriskservis.wpayin.wallet.ui.theme.SurfaceBorder
 import io.noriskservis.wpayin.wallet.ui.theme.SurfaceLight
 import io.noriskservis.wpayin.wallet.ui.theme.TextSecondary
 import io.noriskservis.wpayin.wallet.ui.theme.TextTertiary
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import java.math.BigDecimal
 import java.util.Locale
 
 @Composable
 fun SendScreen(
     state: WalletState,
+    initialAssetId: String? = null,
     onPrepare: (String, String, String, (Result<TransferDraft>) -> Unit) -> Unit,
     onAuthenticate: ((Result<Unit>) -> Unit) -> Unit,
     onSend: (TransferDraft, (Result<WalletTransaction>) -> Unit) -> Unit,
+    onAddSavedAddress: (String, String) -> Result<SavedAddress> = { _, _ ->
+        Result.failure(IllegalStateException("Saved addresses are unavailable"))
+    },
+    onRemoveSavedAddress: (String) -> Unit = {},
     onBack: () -> Unit,
     onFinished: () -> Unit,
 ) {
@@ -93,10 +108,18 @@ fun SendScreen(
         it.blockchain.isEvm || (it.blockchain in setOf(Blockchain.SOLANA, Blockchain.BITCOIN) && it.isNative)
     }
     val assetSymbols = assets.map { it.symbol.uppercase() }.distinct().sorted()
-    var selectedSymbol by remember(assets) { mutableStateOf<String?>(null) }
-    var selectedBlockchain by remember(assets) { mutableStateOf<Blockchain?>(null) }
+    val initialAsset = assets.firstOrNull { it.id == initialAssetId }
+    var selectedSymbol by remember(assets, initialAssetId) {
+        mutableStateOf(initialAsset?.symbol?.uppercase())
+    }
+    var selectedBlockchain by remember(assets, initialAssetId) {
+        mutableStateOf(initialAsset?.blockchain)
+    }
     var showAssetPicker by remember { mutableStateOf(false) }
     var showNetworkPicker by remember { mutableStateOf(false) }
+    var showSavedAddressPicker by remember { mutableStateOf(false) }
+    var showSaveAddressDialog by remember { mutableStateOf(false) }
+    var savedAddressName by remember { mutableStateOf("") }
     var recipient by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var draft by remember { mutableStateOf<TransferDraft?>(null) }
@@ -109,9 +132,20 @@ fun SendScreen(
     val requiresNetworkSelection = selectedAssetNetworks.size > 1
     val recipientStep = if (requiresNetworkSelection) 3 else 2
     val recipientValid = selectedBlockchain?.let { recipient.isValidAddressFor(it) } == true
+    val compatibleSavedAddresses = state.savedAddresses.filter { saved ->
+        selectedBlockchain?.let { saved.address.isValidAddressFor(it) } == true
+    }
     val amountValue = amount.toDoubleOrNull() ?: 0.0
     val amountValid = selectedAsset != null && amountValue > 0 && amountValue <= selectedAsset.balance
     val context = LocalContext.current
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let { scanned ->
+            recipient = scanned.extractWalletAddress()
+            amount = ""
+            draft = null
+            localError = null
+        }
+    }
 
     WpayinBackground {
         Column(
@@ -120,7 +154,7 @@ fun SendScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            ScreenHeader(title = "Withdraw", onBack = onBack)
+            ScreenHeader(title = stringResource(R.string.send_title), onBack = onBack)
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -148,17 +182,25 @@ fun SendScreen(
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                if (selectedBlockchain == Blockchain.BITCOIN) "Send Bitcoin" else "Send Funds",
+                                stringResource(
+                                    if (selectedBlockchain == Blockchain.BITCOIN) {
+                                        R.string.send_bitcoin_title
+                                    } else {
+                                        R.string.send_funds_title
+                                    },
+                                ),
                                 fontSize = 23.sp,
                                 lineHeight = 26.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                if (selectedBlockchain == Blockchain.BITCOIN) {
-                                    "Send BTC to any Bitcoin address"
-                                } else {
-                                    "Send cryptocurrency to another wallet"
-                                },
+                                stringResource(
+                                    if (selectedBlockchain == Blockchain.BITCOIN) {
+                                        R.string.send_bitcoin_subtitle
+                                    } else {
+                                        R.string.send_funds_subtitle
+                                    },
+                                ),
                                 color = TextSecondary,
                                 fontSize = 13.sp,
                             )
@@ -169,7 +211,7 @@ fun SendScreen(
                 item {
                     SendStepCard(
                         stepNumber = 1,
-                        title = "Select Asset",
+                        title = stringResource(R.string.send_select_asset),
                         isComplete = selectedAsset != null,
                     ) {
                         Row(
@@ -191,7 +233,11 @@ fun SendScreen(
                                         fontWeight = FontWeight.SemiBold,
                                     )
                                     Text(
-                                        "Balance: ${selectedAsset.balance.displayAmount()} ${selectedAsset.symbol}",
+                                        stringResource(
+                                            R.string.common_balance_format,
+                                            selectedAsset.balance.displayAmount(),
+                                            selectedAsset.symbol,
+                                        ),
                                         color = TextSecondary,
                                         fontSize = 12.sp,
                                     )
@@ -212,7 +258,7 @@ fun SendScreen(
                                     Text("$", color = Indigo, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Text(
-                                    "Select Token",
+                                    stringResource(R.string.send_select_token),
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(start = 13.dp).weight(1f),
@@ -232,7 +278,7 @@ fun SendScreen(
                     item {
                         SendStepCard(
                             stepNumber = 2,
-                            title = "Select Network",
+                            title = stringResource(R.string.send_select_network),
                             isComplete = selectedBlockchain != null,
                         ) {
                             NetworkSelectionRow(
@@ -248,7 +294,7 @@ fun SendScreen(
                     item {
                         SendStepCard(
                             stepNumber = recipientStep,
-                            title = "Recipient Address",
+                            title = stringResource(R.string.send_recipient_address),
                             isComplete = recipientValid,
                         ) {
                             OutlinedTextField(
@@ -263,25 +309,45 @@ fun SendScreen(
                                     Text(
                                         when (selectedAsset.blockchain) {
                                             Blockchain.BITCOIN -> "bc1..."
-                                            Blockchain.SOLANA -> "Solana address"
+                                            Blockchain.SOLANA -> stringResource(R.string.send_solana_address_placeholder)
                                             else -> "0x..."
                                         },
                                     )
                                 },
                                 trailingIcon = {
-                                    Icon(
-                                        Icons.Rounded.ContentPaste,
-                                        contentDescription = "Paste address",
-                                        tint = Indigo,
-                                        modifier = Modifier.clickable {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.let {
-                                                recipient = it.trim()
-                                                draft = null
-                                                localError = null
-                                            }
-                                        },
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(end = 12.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.QrCodeScanner,
+                                            contentDescription = stringResource(R.string.send_scan_qr),
+                                            tint = Indigo,
+                                            modifier = Modifier.clickable {
+                                                scanLauncher.launch(
+                                                    ScanOptions()
+                                                        .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                                        .setPrompt("")
+                                                        .setBeepEnabled(false)
+                                                        .setOrientationLocked(true),
+                                                )
+                                            },
+                                        )
+                                        Icon(
+                                            Icons.Rounded.ContentPaste,
+                                            contentDescription = stringResource(R.string.send_paste_address),
+                                            tint = Indigo,
+                                            modifier = Modifier.clickable {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.let {
+                                                    recipient = it.trim()
+                                                    draft = null
+                                                    localError = null
+                                                }
+                                            },
+                                        )
+                                    }
                                 },
                                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                                 isError = recipient.isNotBlank() && !recipientValid,
@@ -292,9 +358,12 @@ fun SendScreen(
                             )
                             Text(
                                 when {
-                                    recipient.isBlank() -> "Enter or paste the destination wallet address"
-                                    recipientValid -> "Address is valid for ${selectedAsset.blockchain.displayName}"
-                                    else -> "Please enter a valid wallet address"
+                                    recipient.isBlank() -> stringResource(R.string.send_enter_address_hint)
+                                    recipientValid -> stringResource(
+                                        R.string.send_address_valid,
+                                        selectedAsset.blockchain.displayName,
+                                    )
+                                    else -> stringResource(R.string.send_address_invalid)
                                 },
                                 color = when {
                                     recipient.isBlank() -> TextTertiary
@@ -304,6 +373,68 @@ fun SendScreen(
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 10.dp, start = 3.dp),
                             )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 13.dp),
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                        .background(SurfaceLight, RoundedCornerShape(13.dp))
+                                        .border(1.dp, SurfaceBorder, RoundedCornerShape(13.dp))
+                                        .clickable { showSavedAddressPicker = true },
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.BookmarkBorder,
+                                        contentDescription = null,
+                                        tint = Indigo,
+                                        modifier = Modifier.size(17.dp),
+                                    )
+                                    Text(
+                                        stringResource(R.string.send_saved_count, compatibleSavedAddresses.size),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(start = 6.dp),
+                                    )
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                        .background(
+                                            if (recipientValid) Indigo.copy(alpha = 0.12f) else SurfaceLight,
+                                            RoundedCornerShape(13.dp),
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (recipientValid) Indigo.copy(alpha = 0.3f) else SurfaceBorder,
+                                            RoundedCornerShape(13.dp),
+                                        )
+                                        .clickable(enabled = recipientValid) {
+                                            savedAddressName = ""
+                                            showSaveAddressDialog = true
+                                        },
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Save,
+                                        contentDescription = null,
+                                        tint = if (recipientValid) Indigo else TextTertiary,
+                                        modifier = Modifier.size(17.dp),
+                                    )
+                                    Text(
+                                        stringResource(R.string.send_save_address),
+                                        color = if (recipientValid) Color.White else TextTertiary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(start = 6.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -312,7 +443,7 @@ fun SendScreen(
                     item {
                         SendStepCard(
                             stepNumber = recipientStep + 1,
-                            title = "Amount",
+                            title = stringResource(R.string.send_amount),
                             isComplete = amountValid,
                         ) {
                             OutlinedTextField(
@@ -328,7 +459,7 @@ fun SendScreen(
                                 suffix = { Text(selectedAsset.symbol, fontWeight = FontWeight.SemiBold) },
                                 trailingIcon = {
                                     Text(
-                                        "MAX",
+                                        stringResource(R.string.send_max),
                                         color = Indigo,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
@@ -347,7 +478,7 @@ fun SendScreen(
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp, start = 3.dp, end = 3.dp),
                             ) {
-                                Text("Available", color = TextSecondary, fontSize = 12.sp)
+                                Text(stringResource(R.string.send_available), color = TextSecondary, fontSize = 12.sp)
                                 Spacer(Modifier.weight(1f))
                                 Text(
                                     "${selectedAsset.balance.displayAmount()} ${selectedAsset.symbol}",
@@ -362,7 +493,7 @@ fun SendScreen(
                     item {
                         SendStepCard(
                             stepNumber = recipientStep + 2,
-                            title = "Network Fee",
+                            title = stringResource(R.string.send_network_fee),
                             isComplete = false,
                         ) {
                             Row(
@@ -374,10 +505,19 @@ fun SendScreen(
                                     .padding(horizontal = 14.dp),
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("Standard", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("Calculated before signing", color = TextTertiary, fontSize = 10.sp)
+                                    Text(stringResource(R.string.send_fee_standard), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        stringResource(R.string.send_fee_calculated_before_signing),
+                                        color = TextTertiary,
+                                        fontSize = 10.sp,
+                                    )
                                 }
-                                Text("Estimate at review", color = Indigo, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    stringResource(R.string.send_fee_estimate_at_review),
+                                    color = Indigo,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
                             }
                         }
                     }
@@ -388,8 +528,9 @@ fun SendScreen(
                 }
             }
 
+            val prepareFailedMessage = stringResource(R.string.send_unable_to_prepare)
             PrimaryButton(
-                title = if (isPreparing) "Estimating network fee…" else "Review and sign  →",
+                title = stringResource(if (isPreparing) R.string.send_estimating_fee else R.string.send_review_and_sign),
                 enabled = selectedAsset != null && recipientValid && amountValid && !isPreparing,
                 onClick = {
                     val asset = selectedAsset ?: return@PrimaryButton
@@ -399,7 +540,7 @@ fun SendScreen(
                         isPreparing = false
                         result.fold(
                             onSuccess = { draft = it },
-                            onFailure = { localError = it.message ?: "Unable to prepare transaction" },
+                            onFailure = { localError = it.message ?: prepareFailedMessage },
                         )
                     }
                 },
@@ -411,7 +552,7 @@ fun SendScreen(
     if (showAssetPicker) {
         AlertDialog(
             onDismissRequest = { showAssetPicker = false },
-            title = { Text("Select Asset") },
+            title = { Text(stringResource(R.string.send_select_asset)) },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -455,7 +596,7 @@ fun SendScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAssetPicker = false }) { Text("Close") }
+                TextButton(onClick = { showAssetPicker = false }) { Text(stringResource(R.string.common_close)) }
             },
         )
     }
@@ -463,7 +604,7 @@ fun SendScreen(
     if (showNetworkPicker) {
         AlertDialog(
             onDismissRequest = { showNetworkPicker = false },
-            title = { Text("Select Network") },
+            title = { Text(stringResource(R.string.send_select_network)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     selectedAssetNetworks.forEach { asset ->
@@ -502,7 +643,117 @@ fun SendScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showNetworkPicker = false }) { Text("Close") }
+                TextButton(onClick = { showNetworkPicker = false }) { Text(stringResource(R.string.common_close)) }
+            },
+        )
+    }
+
+    if (showSavedAddressPicker) {
+        AlertDialog(
+            onDismissRequest = { showSavedAddressPicker = false },
+            title = { Text(stringResource(R.string.send_saved_addresses)) },
+            text = {
+                if (compatibleSavedAddresses.isEmpty()) {
+                    Text(
+                        stringResource(
+                            R.string.send_no_compatible_saved,
+                            selectedBlockchain?.displayName ?: stringResource(R.string.send_review_network),
+                        ),
+                        color = TextSecondary,
+                    )
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                    ) {
+                        compatibleSavedAddresses.forEach { saved ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(SurfaceLight, RoundedCornerShape(15.dp))
+                                    .clickable {
+                                        recipient = saved.address
+                                        amount = ""
+                                        draft = null
+                                        localError = null
+                                        showSavedAddressPicker = false
+                                    }
+                                    .padding(12.dp),
+                            ) {
+                                Icon(Icons.Rounded.BookmarkBorder, contentDescription = null, tint = Indigo)
+                                Column(Modifier.padding(start = 11.dp).weight(1f)) {
+                                    Text(saved.name, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        saved.address.shortAddress(),
+                                        color = TextSecondary,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                                Icon(
+                                    Icons.Rounded.DeleteOutline,
+                                    contentDescription = stringResource(R.string.send_delete_saved_address),
+                                    tint = TextTertiary,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { onRemoveSavedAddress(saved.id) },
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSavedAddressPicker = false }) { Text(stringResource(R.string.common_close)) }
+            },
+        )
+    }
+
+    if (showSaveAddressDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveAddressDialog = false },
+            title = { Text(stringResource(R.string.send_save_address)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        recipient.shortAddress(),
+                        color = TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                    OutlinedTextField(
+                        value = savedAddressName,
+                        onValueChange = {
+                            savedAddressName = it.take(50)
+                            localError = null
+                        },
+                        label = { Text(stringResource(R.string.send_name)) },
+                        placeholder = { Text(stringResource(R.string.send_name_placeholder)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(15.dp),
+                        colors = sendFieldColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    localError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveAddressDialog = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+            confirmButton = {
+                val saveFailedMessage = stringResource(R.string.send_unable_to_save_address)
+                TextButton(
+                    enabled = savedAddressName.isNotBlank(),
+                    onClick = {
+                        onAddSavedAddress(savedAddressName, recipient).fold(
+                            onSuccess = {
+                                showSaveAddressDialog = false
+                                savedAddressName = ""
+                            },
+                            onFailure = { localError = it.message ?: saveFailedMessage },
+                        )
+                    },
+                ) { Text(stringResource(R.string.common_save)) }
             },
         )
     }
@@ -510,31 +761,34 @@ fun SendScreen(
     draft?.let { review ->
         AlertDialog(
             onDismissRequest = { if (!state.isSending) draft = null },
-            title = { Text("Review transfer") },
+            title = { Text(stringResource(R.string.send_review_transfer)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                    ReviewLine("Asset", "${review.amount} ${review.symbol}")
-                    ReviewLine("Network", review.blockchain.displayName)
-                    ReviewLine("Recipient", review.to.shortAddress())
+                    ReviewLine(stringResource(R.string.send_review_asset), "${review.amount} ${review.symbol}")
+                    ReviewLine(stringResource(R.string.send_review_network), review.blockchain.displayName)
+                    ReviewLine(stringResource(R.string.send_review_recipient), review.to.shortAddress())
                     ReviewLine(
-                        "Maximum network fee",
+                        stringResource(R.string.send_review_max_fee),
                         "${review.maximumNetworkFee.displayAmount()} ${review.blockchain.symbol}",
                     )
                     if (review is EvmTransferDraft) {
                         ReviewLine(
-                            "Gas price",
+                            stringResource(R.string.send_review_gas_price),
                             "${review.gasPriceWei.toBigDecimal().movePointLeft(9).stripTrailingZeros().toPlainString()} Gwei",
                         )
                     }
                     if (review is BitcoinTransferDraft) {
-                        ReviewLine("Fee rate", "${review.feeRateSatsPerVByte} sat/vB")
-                        ReviewLine("Inputs", review.selectedUtxos.size.toString())
+                        ReviewLine(stringResource(R.string.send_review_fee_rate), "${review.feeRateSatsPerVByte} sat/vB")
+                        ReviewLine(stringResource(R.string.send_review_inputs), review.selectedUtxos.size.toString())
                     }
                     if (review is SolanaTransferDraft) {
-                        ReviewLine("Blockhash validity", "until block ${review.lastValidBlockHeight}")
+                        ReviewLine(
+                            stringResource(R.string.send_review_blockhash),
+                            stringResource(R.string.send_review_blockhash_value, review.lastValidBlockHeight),
+                        )
                     }
                     Text(
-                        "The actual fee can be lower. If it rises more than 25% before signing, a new review is required.",
+                        stringResource(R.string.send_fee_note),
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -542,9 +796,13 @@ fun SendScreen(
                 }
             },
             dismissButton = {
-                TextButton(enabled = !state.isSending, onClick = { draft = null }) { Text("Cancel") }
+                TextButton(enabled = !state.isSending, onClick = { draft = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
             confirmButton = {
+                val transactionFailedMessage = stringResource(R.string.send_transaction_failed)
+                val authFailedMessage = stringResource(R.string.auth_failed)
                 TextButton(
                     enabled = !state.isSending,
                     onClick = {
@@ -559,17 +817,17 @@ fun SendScreen(
                                                 draft = null
                                             },
                                             onFailure = {
-                                                localError = it.message ?: "Transaction failed"
+                                                localError = it.message ?: transactionFailedMessage
                                                 draft = null
                                             },
                                         )
                                     }
                                 },
-                                onFailure = { localError = it.message ?: "Authentication failed" },
+                                onFailure = { localError = it.message ?: authFailedMessage },
                             )
                         }
                     },
-                ) { Text(if (state.isSending) "Sending…" else "Confirm & Send") }
+                ) { Text(stringResource(if (state.isSending) R.string.send_sending else R.string.send_confirm)) }
             },
         )
     }
@@ -578,10 +836,10 @@ fun SendScreen(
         val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Transaction submitted", color = Success) },
+            title = { Text(stringResource(R.string.send_submitted), color = Success) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("The signed transaction was accepted by ${transaction.blockchain.displayName}.")
+                    Text(stringResource(R.string.send_submitted_message, transaction.blockchain.displayName))
                     Text(
                         transaction.hash,
                         maxLines = 2,
@@ -592,11 +850,11 @@ fun SendScreen(
             },
             dismissButton = {
                 TextButton(onClick = { uriHandler.openUri(transaction.explorerUrl) }) {
-                    Text("View on Explorer")
+                    Text(stringResource(R.string.common_view_on_explorer))
                 }
             },
             confirmButton = {
-                TextButton(onClick = onFinished) { Text("Done") }
+                TextButton(onClick = onFinished) { Text(stringResource(R.string.common_done)) }
             },
         )
     }
@@ -681,8 +939,12 @@ private fun NetworkSelectionRow(
                 Text("◎", color = Indigo, fontWeight = FontWeight.Bold)
             }
             Column(Modifier.padding(start = 13.dp).weight(1f)) {
-                Text("Select Network", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("$availableCount networks available", color = TextSecondary, fontSize = 12.sp)
+                Text(stringResource(R.string.send_select_network), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.send_networks_available, availableCount),
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                )
             }
         }
         Icon(
@@ -724,6 +986,10 @@ private fun String.isValidAddressFor(blockchain: Blockchain): Boolean = when {
 }
 
 private fun String.shortAddress(): String = if (length <= 16) this else "${take(7)}…${takeLast(6)}"
+
+/** Accepts raw addresses plus BIP-21/EIP-681 style URIs ("bitcoin:bc1…?amount=", "ethereum:0x…"). */
+private fun String.extractWalletAddress(): String =
+    trim().substringBefore('?').substringAfterLast(':').substringBefore('@').trim()
 
 private fun Double.displayAmount(): String = when {
     this == 0.0 -> "0"

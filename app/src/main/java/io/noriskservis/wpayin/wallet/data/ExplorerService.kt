@@ -2,6 +2,8 @@ package io.noriskservis.wpayin.wallet.data
 
 import io.noriskservis.wpayin.wallet.BuildConfig
 import io.noriskservis.wpayin.wallet.model.Blockchain
+import io.noriskservis.wpayin.wallet.model.KnownToken
+import io.noriskservis.wpayin.wallet.model.KnownTokenCatalog
 import io.noriskservis.wpayin.wallet.model.TransactionStatus
 import io.noriskservis.wpayin.wallet.model.TransactionType
 import io.noriskservis.wpayin.wallet.model.WalletAccount
@@ -11,6 +13,12 @@ import java.time.Instant
 import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
+
+data class IndexedTokenBalance(
+    val token: KnownToken,
+    val balance: Double,
+    val priceUsd: Double,
+)
 
 class ExplorerService(
     private val client: HttpJsonClient = HttpJsonClient(),
@@ -22,6 +30,21 @@ class ExplorerService(
         else -> emptyList()
     }
 
+    /**
+     * Discovers positive ERC-20 balances from the same public Blockscout
+     * indexes already used for transaction history. RPC remains authoritative
+     * for built-in and user-added tokens; this fills the discovery gap for
+     * other assets held by the address.
+     */
+    suspend fun tokenBalances(account: WalletAccount): List<IndexedTokenBalance> {
+        if (!account.blockchain.isEvm) return emptyList()
+        val baseUrl = account.blockchain.blockscoutBaseUrl() ?: return emptyList()
+        val response = client.getArray(
+            "$baseUrl/api/v2/addresses/${account.address}/token-balances",
+        )
+        return parseBlockscoutTokenBalances(account.blockchain, response)
+    }
+
     private suspend fun evmTransactions(account: WalletAccount): List<WalletTransaction> {
         val key = BuildConfig.ETHERSCAN_API_KEY.trim()
         val primary = if (key.isNotEmpty()) {
@@ -29,8 +52,8 @@ class ExplorerService(
         } else {
             null
         }
-        val combined = primary ?: account.blockchain.blockscoutApiUrl()?.let { baseUrl ->
-            runCatching { explorerTransactions(account, baseUrl) }.getOrNull()
+        val combined = primary ?: account.blockchain.blockscoutBaseUrl()?.let { baseUrl ->
+            runCatching { explorerTransactions(account, "$baseUrl/api") }.getOrNull()
         }.orEmpty()
 
         return combined
@@ -308,12 +331,12 @@ class ExplorerService(
     private fun etherscanUrl(account: WalletAccount, apiKey: String): String =
         "https://api.etherscan.io/v2/api?chainid=${requireNotNull(account.blockchain.chainId)}&apikey=$apiKey"
 
-    private fun Blockchain.blockscoutApiUrl(): String? = when (this) {
-        Blockchain.ETHEREUM -> "https://eth.blockscout.com/api"
-        Blockchain.POLYGON -> "https://polygon.blockscout.com/api"
-        Blockchain.ARBITRUM -> "https://arbitrum.blockscout.com/api"
-        Blockchain.OPTIMISM -> "https://optimism.blockscout.com/api"
-        Blockchain.BASE -> "https://base.blockscout.com/api"
+    private fun Blockchain.blockscoutBaseUrl(): String? = when (this) {
+        Blockchain.ETHEREUM -> "https://eth.blockscout.com"
+        Blockchain.POLYGON -> "https://polygon.blockscout.com"
+        Blockchain.ARBITRUM -> "https://arbitrum.blockscout.com"
+        Blockchain.OPTIMISM -> "https://optimism.blockscout.com"
+        Blockchain.BASE -> "https://base.blockscout.com"
         else -> null
     }
 
@@ -371,3 +394,66 @@ class ExplorerService(
         .put("method", method)
         .put("params", params)
 }
+
+internal fun parseBlockscoutTokenBalances(
+    blockchain: Blockchain,
+    entries: JSONArray,
+): List<IndexedTokenBalance> = buildList {
+    for (index in 0 until entries.length()) {
+        val entry = entries.optJSONObject(index) ?: continue
+        val metadata = entry.optJSONObject("token") ?: continue
+        if (!metadata.optString("type").equals("ERC-20", ignoreCase = true)) continue
+        if (metadata.optString("reputation").trim().lowercase() in UNSAFE_TOKEN_REPUTATIONS) continue
+
+        val contractAddress = metadata.optString("address_hash").trim().lowercase()
+        val decimals = metadata.optString("decimals").toIntOrNull() ?: continue
+        val name = metadata.optString("name").trim()
+        val symbol = metadata.optString("symbol").trim()
+        val rawBalance = entry.optString("value").toBigDecimalOrNull() ?: continue
+        if (
+            !RpcService.isEvmAddress(contractAddress) ||
+            decimals !in 0..36 ||
+            name.isBlank() ||
+            name.length > 80 ||
+            symbol.isBlank() ||
+            symbol.length > 20 ||
+            rawBalance <= BigDecimal.ZERO
+        ) {
+            continue
+        }
+
+        val balance = rawBalance.movePointLeft(decimals).toDouble()
+        if (!balance.isFinite() || balance <= 0.0) continue
+        val catalogToken = KnownTokenCatalog.tokens.firstOrNull {
+            it.blockchain == blockchain &&
+                it.contractAddress.equals(contractAddress, ignoreCase = true)
+        }
+        val exchangeRate = metadata.optString("exchange_rate")
+            .toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?: 0.0
+        add(
+            IndexedTokenBalance(
+                token = KnownToken(
+                    blockchain = blockchain,
+                    symbol = symbol,
+                    name = name,
+                    contractAddress = contractAddress,
+                    decimals = decimals,
+                    coinGeckoId = catalogToken?.coinGeckoId.orEmpty(),
+                ),
+                balance = balance,
+                priceUsd = exchangeRate,
+            ),
+        )
+    }
+}.distinctBy { it.token.contractAddress.lowercase() }
+
+private val UNSAFE_TOKEN_REPUTATIONS = setOf(
+    "spam",
+    "scam",
+    "malicious",
+    "phishing",
+    "suspicious",
+    "unsafe",
+)

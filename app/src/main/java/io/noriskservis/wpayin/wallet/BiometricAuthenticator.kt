@@ -11,16 +11,16 @@ class BiometricAuthenticator(
 ) {
     fun authenticateForSigning(onResult: (Result<Unit>) -> Unit) {
         authenticate(
-            title = "Authorize transaction",
-            subtitle = "Confirm that you want to sign and broadcast this transfer",
+            title = activity.getString(R.string.auth_authorize_transaction),
+            subtitle = activity.getString(R.string.auth_sign_subtitle),
             onResult = onResult,
         )
     }
 
     fun authenticateForUnlock(onResult: (Result<Unit>) -> Unit) {
         authenticate(
-            title = "Unlock Wpayin Wallet",
-            subtitle = "Authenticate to access your wallet",
+            title = activity.getString(R.string.auth_unlock_title),
+            subtitle = activity.getString(R.string.auth_unlock_subtitle),
             onResult = onResult,
         )
     }
@@ -62,7 +62,7 @@ class BiometricAuthenticator(
                 .setAllowedAuthenticators(authenticators)
                 .apply {
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                        setNegativeButtonText("Cancel")
+                        setNegativeButtonText(activity.getString(R.string.common_cancel))
                     }
                 }
                 .build(),
@@ -70,10 +70,11 @@ class BiometricAuthenticator(
     }
 
     private fun Int.userFacingMessage(): String = when (this) {
-        BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "No secure biometric authentication is enrolled"
-        BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "This device has no supported biometric hardware"
-        BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "Biometric authentication is temporarily unavailable"
-        BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED -> "A security update is required before signing"
-        else -> "Secure authentication is unavailable"
+        BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> activity.getString(R.string.auth_no_biometrics_enrolled)
+        BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> activity.getString(R.string.auth_no_biometric_hardware)
+        BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> activity.getString(R.string.auth_biometrics_unavailable)
+        BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED ->
+            activity.getString(R.string.auth_security_update_required)
+        else -> activity.getString(R.string.auth_secure_authentication_unavailable)
     }
 }
