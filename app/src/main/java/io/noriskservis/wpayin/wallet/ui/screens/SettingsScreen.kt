@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Hub
+import androidx.compose.material.icons.rounded.Pentagon
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.FileUpload
@@ -92,6 +93,8 @@ import io.noriskservis.wpayin.wallet.model.AssetListStyle
 import io.noriskservis.wpayin.wallet.model.AUTOMATIC_TIME_ZONE_ID
 import io.noriskservis.wpayin.wallet.model.AutoLockDuration
 import io.noriskservis.wpayin.wallet.model.Blockchain
+import io.noriskservis.wpayin.wallet.model.QuintiumConfig
+import io.noriskservis.wpayin.wallet.model.QuintiumNetwork
 import io.noriskservis.wpayin.wallet.model.FiatCurrency
 import io.noriskservis.wpayin.wallet.model.ExportedPrivateKey
 import io.noriskservis.wpayin.wallet.model.WalletKind
@@ -128,10 +131,14 @@ fun SettingsScreen(
     onRevealPrivateKeys: ((Result<List<ExportedPrivateKey>>) -> Unit) -> Unit = { done ->
         done(Result.failure(IllegalStateException("Private keys are unavailable")))
     },
+    onSaveQuintium: (QuintiumNetwork, String, String, (Result<Unit>) -> Unit) -> Unit = { _, _, _, done ->
+        done(Result.failure(IllegalStateException("Quintium settings are unavailable")))
+    },
     onNestedScreenChanged: (Boolean) -> Unit = {},
 ) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showNetworks by remember { mutableStateOf(false) }
+    var showQuintium by remember { mutableStateOf(false) }
     var showCurrencies by remember { mutableStateOf(false) }
     var showLanguages by remember { mutableStateOf(false) }
     var showHelpCenter by remember { mutableStateOf(false) }
@@ -147,6 +154,7 @@ fun SettingsScreen(
     var revealError by remember { mutableStateOf<String?>(null) }
     var notificationPermissionDenied by remember { mutableStateOf(false) }
     val nestedScreenVisible = showNetworks ||
+        showQuintium ||
         showCurrencies ||
         showLanguages ||
         showHelpCenter ||
@@ -190,11 +198,20 @@ fun SettingsScreen(
         }
     }
 
+    if (showQuintium) {
+        QuintiumSettingsScreen(
+            onBack = { showQuintium = false },
+            onSave = onSaveQuintium,
+        )
+        return
+    }
+
     if (showNetworks) {
         ManageNetworksScreen(
             state = state,
             onBack = { showNetworks = false },
             onNetworkEnabled = onNetworkEnabled,
+            onOpenQuintium = { showQuintium = true },
         )
         return
     }
@@ -456,6 +473,13 @@ fun SettingsScreen(
                     onClick = { showNetworks = true },
                 )
                 SettingsRow(
+                    icon = Icons.Rounded.Pentagon,
+                    title = stringResource(R.string.quintium_title),
+                    subtitle = "${Blockchain.QUINTIUM.symbol} · " + stringResource(R.string.quintium_settings_subtitle),
+                    tint = Color(0xFFF2B544),
+                    onClick = { showQuintium = true },
+                )
+                SettingsRow(
                     icon = Icons.Rounded.Link,
                     title = stringResource(R.string.settings_walletconnect),
                     subtitle = stringResource(R.string.settings_walletconnect_subtitle),
@@ -541,9 +565,11 @@ private fun ManageNetworksScreen(
     state: WalletState,
     onBack: () -> Unit,
     onNetworkEnabled: (Blockchain, Boolean) -> Unit,
+    onOpenQuintium: () -> Unit = {},
 ) {
     val categories = listOf(
         R.string.settings_base_layer to listOf(Blockchain.ETHEREUM, Blockchain.BITCOIN),
+        R.string.quintium_title to listOf(Blockchain.QUINTIUM),
         R.string.settings_evm_networks to listOf(
             Blockchain.ARBITRUM,
             Blockchain.BASE,
@@ -590,6 +616,7 @@ private fun ManageNetworksScreen(
                                     state.wallet?.account(it) != null
                                 } > 1,
                                 onToggle = { onNetworkEnabled(blockchain, it) },
+                                onClick = if (blockchain == Blockchain.QUINTIUM) onOpenQuintium else null,
                             )
                         }
                     }
@@ -609,10 +636,14 @@ private fun NetworkSettingsRow(
     available: Boolean,
     canDisable: Boolean,
     onToggle: (Boolean) -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         CryptoNetworkIcon(blockchain, 38)
         Column(Modifier.padding(start = 13.dp).weight(1f)) {
@@ -625,6 +656,8 @@ private fun NetworkSettingsRow(
             Text(
                 when {
                     !available -> stringResource(R.string.settings_network_unavailable)
+                    blockchain == Blockchain.QUINTIUM && !QuintiumConfig.isConfigured ->
+                        stringResource(R.string.quintium_no_node)
                     blockchain.chainId != null -> stringResource(R.string.settings_chain_id, blockchain.chainId)
                     else -> blockchain.symbol
                 },

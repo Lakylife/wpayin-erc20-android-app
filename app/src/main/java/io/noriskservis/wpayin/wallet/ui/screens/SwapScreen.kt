@@ -92,8 +92,9 @@ fun SwapScreen(
 ) {
     // Defense in depth: Swap accepts bundled/user-added contracts plus assets
     // whose exact explorer contract has a positive market quote.
+    // Quintium has no swap or bridge route yet (LI.FI does not list the chain).
     val walletAssets = state.wallet?.assets.orEmpty().filter {
-        it.isTrustedWalletAsset(state.customTokens)
+        it.blockchain != Blockchain.QUINTIUM && it.isTrustedWalletAsset(state.customTokens)
     }
     val assets = walletAssets.filter { it.blockchain.isEvm }
     // Native BTC/SOL are valid bridge destinations, and native BTC also a source, matching iOS.

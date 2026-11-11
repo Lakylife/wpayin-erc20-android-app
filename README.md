@@ -1,6 +1,6 @@
-# Wpayin Wallet for Android 1.1.3
+# Wpayin Wallet for Android 1.2.0
 
-Version code: **5**. See [release notes](RELEASE_NOTES_v1.1.3.md) for changes and remaining validation.
+Version code: **6**. See [release notes](RELEASE_NOTES_v1.2.0.md) for changes and remaining validation.
 
 Native Android port of Wpayin Wallet, isolated from the iOS project in its own
 folder. The UI is written in Kotlin and Jetpack Compose. Real key generation and
@@ -18,29 +18,54 @@ Captured from the native Android `previewDebug` build on a Pixel 9 emulator
 balances, public addresses, and transactions; it never contains wallet keys.
 
 <p align="center">
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/01_launch.png" width="210" alt="Android launch screen" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/02_onboarding.png" width="210" alt="Android onboarding" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/03_welcome.png" width="210" alt="Android welcome screen" />
+  <img src="screenshots/20261111_v1.2.0/01_launch.png" width="210" alt="Android launch screen" />
+  <img src="screenshots/20261111_v1.2.0/02_onboarding.png" width="210" alt="Android onboarding" />
+  <img src="screenshots/20261111_v1.2.0/03_welcome.png" width="210" alt="Android welcome screen" />
 </p>
 <p align="center">
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/04_home.png" width="210" alt="Android home screen" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/05_swap.png" width="210" alt="Android swap screen" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/06_activity.png" width="210" alt="Android activity screen" />
+  <img src="screenshots/20261111_v1.2.0/04_home.png" width="210" alt="Android home screen" />
+  <img src="screenshots/20261111_v1.2.0/05_swap.png" width="210" alt="Android swap screen" />
+  <img src="screenshots/20261111_v1.2.0/06_activity.png" width="210" alt="Android activity screen" />
 </p>
 <p align="center">
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/07_settings.png" width="210" alt="Android settings screen" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/08_receive.png" width="210" alt="Android receive selection" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/09_send.png" width="210" alt="Android send selection" />
+  <img src="screenshots/20261111_v1.2.0/07_settings.png" width="210" alt="Android settings screen" />
+  <img src="screenshots/20261111_v1.2.0/08_receive.png" width="210" alt="Android receive selection" />
+  <img src="screenshots/20261111_v1.2.0/09_send.png" width="210" alt="Android send selection" />
 </p>
 <p align="center">
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/06_activity_ethereum.png" width="210" alt="Android activity Ethereum filter" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/08_receive_details.png" width="210" alt="Android receive QR details" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/09_send_recipient.png" width="210" alt="Android send recipient step" />
+  <img src="screenshots/20261111_v1.2.0/06_activity_ethereum.png" width="210" alt="Android activity Ethereum filter" />
+  <img src="screenshots/20261111_v1.2.0/08_receive_details.png" width="210" alt="Android receive QR details" />
+  <img src="screenshots/20261111_v1.2.0/09_send_recipient.png" width="210" alt="Android send recipient step" />
 </p>
 <p align="center">
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/09_send_amount.png" width="210" alt="Android send amount and fee steps" />
-  <img src="screenshots/20260717_pixel9_ios_parity_v2/10_app_lock.png" width="210" alt="Android app lock" />
+  <img src="screenshots/20261111_v1.2.0/09_send_amount.png" width="210" alt="Android send amount and fee steps" />
+  <img src="screenshots/20261111_v1.2.0/10_app_lock.png" width="210" alt="Android app lock" />
+  <img src="screenshots/20261111_v1.2.0/11_quintium.png" width="210" alt="Android Quintium settings" />
 </p>
+
+## Quintium (QU)
+
+Version 1.2.0 adds Quintium, the project's
+own EVM-compatible Proof-of-Work chain, with the same behaviour as the iOS app:
+
+| | Mainnet | Testnet |
+| --- | --- | --- |
+| Coin | QU | tQU |
+| Chain ID | 52401 | 52402 |
+| Default node RPC port | 8545 | 8546 |
+| Status | starts 1 January 2027 | running |
+
+- One Quintium slot follows the network chosen in **Settings → Quintium**
+  (testnet by default). The coin, chain ID and node switch together.
+- Quintium uses Ethereum keys and addresses (`m/44'/60'/0'/0`), so the Quintium
+  address equals the Ethereum address of the same wallet.
+- There is no public Quintium RPC yet. Enter your own node URL in the app, or
+  set `QUINTIUM_TESTNET_RPC_URL` / `QUINTIUM_RPC_URL` (and optionally
+  `QUINTIUM_TESTNET_EXPLORER_URL` / `QUINTIUM_EXPLORER_URL`) as Gradle
+  properties for a build. **Test connection** checks the node's chain ID.
+- Balances, sending (EIP-155 signed by Wallet Core) and history come straight
+  from the node; history uses its `aether_addressTxs` index.
+- Not available for Quintium yet: swap, bridge, NFTs and fiat prices.
 
 ## Toolchain
 
@@ -109,6 +134,8 @@ checking them into the repository:
 ```properties
 COINGECKO_API_KEY=...
 ETHERSCAN_API_KEY=...
+QUINTIUM_TESTNET_RPC_URL=https://...
+QUINTIUM_RPC_URL=https://...
 ```
 
 The base wallet and native balance refresh still work without these optional
@@ -121,7 +148,7 @@ values.
 - original Wpayin visual assets and theme, including shared iOS-matched token
   and network icons
 - Bitcoin, Ethereum, Solana, BNB Chain, Polygon, Arbitrum, Optimism, Avalanche,
-  and Base account derivation through Wallet Core
+  Base and Quintium account derivation through Wallet Core
 - mnemonic and EVM private-key import
 - AES-256-GCM encryption with a non-exportable Android Keystore key
 - backups/device transfer disabled for wallet files and preferences

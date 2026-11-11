@@ -8,11 +8,20 @@ import io.noriskservis.wpayin.wallet.model.AutoLockDuration
 import io.noriskservis.wpayin.wallet.model.AUTOMATIC_TIME_ZONE_ID
 import io.noriskservis.wpayin.wallet.model.Blockchain
 import io.noriskservis.wpayin.wallet.model.FiatCurrency
+import io.noriskservis.wpayin.wallet.BuildConfig
+import io.noriskservis.wpayin.wallet.model.QuintiumConfig
+import io.noriskservis.wpayin.wallet.model.QuintiumNetwork
 
 class SettingsStore(context: Context) {
     private val preferences = context.getSharedPreferences("wpayin_settings", Context.MODE_PRIVATE)
 
-    fun load(): AppSettings = AppSettings(
+    fun load(): AppSettings {
+        loadQuintium()
+        migrateQuintiumNetwork()
+        return loadSettings()
+    }
+
+    private fun loadSettings(): AppSettings = AppSettings(
         onboardingComplete = preferences.getBoolean(KEY_ONBOARDING, false),
         currencyCode = preferences.getString(KEY_CURRENCY, "USD") ?: "USD",
         languageTag = preferences.getString(KEY_LANGUAGE, "system") ?: "system",
@@ -35,6 +44,67 @@ class SettingsStore(context: Context) {
         colorTheme = AppColorTheme.fromStorage(preferences.getString(KEY_COLOR_THEME, null)),
         assetListStyle = AssetListStyle.fromStorage(preferences.getString(KEY_ASSET_LIST_STYLE, null)),
     )
+
+    /** Applies the saved Quintium network, node and explorer to [QuintiumConfig]. */
+    fun loadQuintium() {
+        val network = QuintiumNetwork.fromStorage(preferences.getString(KEY_QUINTIUM_NETWORK, null))
+        val rpc = QuintiumNetwork.entries.associateWith { item ->
+            preferences.getString(quintiumRpcKey(item), null)
+                ?.let(QuintiumConfig::clean)
+                ?.takeIf(String::isNotEmpty)
+                ?: buildValue(if (item.isTestnet) BuildConfig.QUINTIUM_TESTNET_RPC_URL else BuildConfig.QUINTIUM_RPC_URL)
+        }
+        val explorer = QuintiumNetwork.entries.associateWith { item ->
+            preferences.getString(quintiumExplorerKey(item), null)
+                ?.let(QuintiumConfig::clean)
+                ?.takeIf(String::isNotEmpty)
+                ?: buildValue(
+                    if (item.isTestnet) BuildConfig.QUINTIUM_TESTNET_EXPLORER_URL else BuildConfig.QUINTIUM_EXPLORER_URL,
+                )
+        }
+        QuintiumConfig.apply(network, rpc, explorer)
+    }
+
+    fun saveQuintium(network: QuintiumNetwork, rpcUrl: String, explorerUrl: String) {
+        val rpc = QuintiumConfig.clean(rpcUrl)
+        val explorer = QuintiumConfig.clean(explorerUrl)
+        require(rpc.isEmpty() || QuintiumConfig.isValidUrl(rpc)) {
+            "Enter a valid node URL starting with https:// or http://"
+        }
+        require(explorer.isEmpty() || QuintiumConfig.isValidUrl(explorer)) {
+            "Enter a valid explorer URL starting with https:// or http://"
+        }
+        preferences.edit().apply {
+            putString(KEY_QUINTIUM_NETWORK, network.storageValue)
+            if (rpc.isEmpty()) remove(quintiumRpcKey(network)) else putString(quintiumRpcKey(network), rpc)
+            if (explorer.isEmpty()) {
+                remove(quintiumExplorerKey(network))
+            } else {
+                putString(quintiumExplorerKey(network), explorer)
+            }
+        }.apply()
+        loadQuintium()
+    }
+
+    /** Wallets set up before Quintium existed get it switched on once. */
+    private fun migrateQuintiumNetwork() {
+        if (preferences.getBoolean(KEY_QUINTIUM_ADDED, false)) return
+        val saved = preferences.getStringSet(KEY_ENABLED_NETWORKS, null)
+        preferences.edit().apply {
+            if (saved != null && saved.isNotEmpty()) {
+                putStringSet(KEY_ENABLED_NETWORKS, saved + Blockchain.QUINTIUM.name)
+            }
+            putBoolean(KEY_QUINTIUM_ADDED, true)
+        }.apply()
+    }
+
+    private fun buildValue(value: String): String =
+        QuintiumConfig.clean(value).takeIf(QuintiumConfig::isValidUrl).orEmpty()
+
+    private fun quintiumRpcKey(network: QuintiumNetwork) = "$KEY_QUINTIUM_RPC_PREFIX${network.storageValue}"
+
+    private fun quintiumExplorerKey(network: QuintiumNetwork) =
+        "$KEY_QUINTIUM_EXPLORER_PREFIX${network.storageValue}"
 
     fun setOnboardingComplete(complete: Boolean) {
         preferences.edit().putBoolean(KEY_ONBOARDING, complete).apply()
@@ -110,5 +180,9 @@ class SettingsStore(context: Context) {
         private const val KEY_COLOR_THEME = "color_theme"
         private const val KEY_ASSET_LIST_STYLE = "asset_list_style"
         private const val KEY_FIAT_RATE_PREFIX = "fiat_rate_usd_"
+        private const val KEY_QUINTIUM_NETWORK = "quintium_network"
+        private const val KEY_QUINTIUM_RPC_PREFIX = "quintium_rpc_"
+        private const val KEY_QUINTIUM_EXPLORER_PREFIX = "quintium_explorer_"
+        private const val KEY_QUINTIUM_ADDED = "quintium_network_added"
     }
 }

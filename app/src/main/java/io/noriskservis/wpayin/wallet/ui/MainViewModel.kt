@@ -9,6 +9,7 @@ import io.noriskservis.wpayin.wallet.data.WalletState
 import io.noriskservis.wpayin.wallet.model.EvmTransferDraft
 import io.noriskservis.wpayin.wallet.model.TransferDraft
 import io.noriskservis.wpayin.wallet.model.Blockchain
+import io.noriskservis.wpayin.wallet.model.QuintiumNetwork
 import io.noriskservis.wpayin.wallet.model.KnownToken
 import io.noriskservis.wpayin.wallet.model.WalletTransaction
 import io.noriskservis.wpayin.wallet.model.SavedAddress
@@ -156,6 +157,15 @@ class MainViewModel(
         onComplete: (Result<Unit>) -> Unit = {},
     ) {
         viewModelScope.launch { onComplete(repository.setNetworkEnabled(blockchain, enabled)) }
+    }
+
+    fun setQuintiumSettings(
+        network: QuintiumNetwork,
+        rpcUrl: String,
+        explorerUrl: String,
+        onComplete: (Result<Unit>) -> Unit = {},
+    ) {
+        viewModelScope.launch { onComplete(repository.setQuintiumSettings(network, rpcUrl, explorerUrl)) }
     }
 
     fun revealWalletSecret() = repository.revealWalletSecret()

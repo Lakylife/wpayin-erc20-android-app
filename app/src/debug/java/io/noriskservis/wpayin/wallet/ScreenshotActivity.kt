@@ -31,6 +31,7 @@ import io.noriskservis.wpayin.wallet.ui.screens.AssetDetailScreen
 import io.noriskservis.wpayin.wallet.ui.screens.AboutScreen
 import io.noriskservis.wpayin.wallet.ui.screens.HelpCenterScreen
 import io.noriskservis.wpayin.wallet.ui.screens.P2PScreen
+import io.noriskservis.wpayin.wallet.ui.screens.QuintiumSettingsScreen
 import io.noriskservis.wpayin.wallet.ui.components.LoadingScreen
 import io.noriskservis.wpayin.wallet.ui.theme.WpayinTheme
 import java.time.Instant
@@ -146,6 +147,10 @@ class ScreenshotActivity : FragmentActivity() {
                             )
                         }
                     }
+                    SCREEN_QUINTIUM -> QuintiumSettingsScreen(
+                        onBack = { activeScreen = SCREEN_MAIN },
+                        onSave = { _, _, _, done -> done(Result.success(Unit)) },
+                    )
                     SCREEN_P2P -> P2PScreen(
                         state = state,
                         onBack = { activeScreen = SCREEN_MAIN },
@@ -229,6 +234,7 @@ class ScreenshotActivity : FragmentActivity() {
         const val SCREEN_ALL_ASSETS = "all_assets"
         const val SCREEN_ASSET_DETAIL = "asset_detail"
         const val SCREEN_P2P = "p2p"
+        const val SCREEN_QUINTIUM = "quintium"
         const val SCREEN_HELP = "help"
         const val SCREEN_ABOUT = "about"
     }
@@ -245,6 +251,7 @@ private fun screenshotState(): WalletState {
         WalletAccount(Blockchain.OPTIMISM, "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f"),
         WalletAccount(Blockchain.AVALANCHE, "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f"),
         WalletAccount(Blockchain.BASE, "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f"),
+        WalletAccount(Blockchain.QUINTIUM, "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f"),
     )
     val assets = listOf(
         Asset(
@@ -319,8 +326,29 @@ private fun screenshotState(): WalletState {
             decimals = 6,
             coinGeckoId = "usd-coin",
         ),
+        // Testnet coins have no market price.
+        Asset(
+            id = "QUINTIUM:native",
+            name = Blockchain.QUINTIUM.displayName,
+            symbol = Blockchain.QUINTIUM.symbol,
+            blockchain = Blockchain.QUINTIUM,
+            balance = 1_250.0,
+            priceUsd = 0.0,
+        ),
     )
     val transactions = listOf(
+        WalletTransaction(
+            hash = "0x" + "5e".repeat(32),
+            blockchain = Blockchain.QUINTIUM,
+            type = TransactionType.RECEIVE,
+            status = TransactionStatus.CONFIRMED,
+            amount = 250.0,
+            symbol = Blockchain.QUINTIUM.symbol,
+            timestamp = Instant.parse("2026-11-10T18:30:00Z"),
+            from = "0x4242424242424242424242424242424242424242",
+            to = accounts[9].address,
+            fee = 0.000021,
+        ),
         WalletTransaction(
             hash = "0x" + "a8".repeat(32),
             blockchain = Blockchain.ETHEREUM,

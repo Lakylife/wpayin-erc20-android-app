@@ -22,8 +22,11 @@ data class IndexedTokenBalance(
 
 class ExplorerService(
     private val client: HttpJsonClient = HttpJsonClient(),
+    private val quintiumNode: QuintiumNodeClient = QuintiumNodeClient(client),
 ) {
     suspend fun transactions(account: WalletAccount): List<WalletTransaction> = when {
+        // Quintium has no Etherscan or Blockscout index; its node keeps the history.
+        account.blockchain == Blockchain.QUINTIUM -> quintiumNode.transactions(account)
         account.blockchain == Blockchain.BITCOIN -> bitcoinTransactions(account)
         account.blockchain == Blockchain.SOLANA -> solanaTransactions(account)
         account.blockchain.isEvm -> evmTransactions(account)

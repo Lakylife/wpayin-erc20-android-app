@@ -70,6 +70,7 @@ import io.noriskservis.wpayin.wallet.model.AppColorTheme
 import io.noriskservis.wpayin.wallet.model.AssetListStyle
 import io.noriskservis.wpayin.wallet.model.ExportedPrivateKey
 import io.noriskservis.wpayin.wallet.model.Blockchain
+import io.noriskservis.wpayin.wallet.model.QuintiumNetwork
 import io.noriskservis.wpayin.wallet.model.ExchangeQuote
 import io.noriskservis.wpayin.wallet.model.WalletTransaction
 import io.noriskservis.wpayin.wallet.ui.components.CryptoTokenIcon
@@ -105,6 +106,9 @@ fun MainTabsScreen(
     onSetAutoLock: (AutoLockDuration) -> Unit = {},
     onDeleteWallet: () -> Unit,
     onNetworkEnabled: (Blockchain, Boolean) -> Unit = { _, _ -> },
+    onSaveQuintium: (QuintiumNetwork, String, String, (Result<Unit>) -> Unit) -> Unit = { _, _, _, done ->
+        done(Result.failure(IllegalStateException("Quintium settings are unavailable")))
+    },
     onPrepareExchange: (String, String, String, (Result<ExchangeQuote>) -> Unit) -> Unit = { _, _, _, done ->
         done(Result.failure(IllegalStateException("Quotes are unavailable")))
     },
@@ -184,6 +188,7 @@ fun MainTabsScreen(
                     onSetAutoLock = onSetAutoLock,
                     onDeleteWallet = onDeleteWallet,
                     onNetworkEnabled = onNetworkEnabled,
+                    onSaveQuintium = onSaveQuintium,
                     onSetCurrency = onSetCurrency,
                     onSetNotifications = onSetNotifications,
                     onSetTimeZone = onSetTimeZone,

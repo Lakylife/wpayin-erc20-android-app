@@ -233,6 +233,9 @@ fun WpayinWalletApp(
                     onNetworkEnabled = { blockchain, enabled ->
                         viewModel.setNetworkEnabled(blockchain, enabled)
                     },
+                    onSaveQuintium = { network, rpcUrl, explorerUrl, done ->
+                        viewModel.setQuintiumSettings(network, rpcUrl, explorerUrl, done)
+                    },
                     onPrepareExchange = viewModel::prepareExchange,
                     onAuthenticateExchange = authenticateForSigning,
                     onExecuteExchange = viewModel::executeExchange,

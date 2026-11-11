@@ -18,6 +18,7 @@ class BlockchainTest {
                 Blockchain.OPTIMISM,
                 Blockchain.AVALANCHE,
                 Blockchain.BASE,
+                Blockchain.QUINTIUM,
             ),
             Blockchain.entries.toSet(),
         )
@@ -32,7 +33,9 @@ class BlockchainTest {
 
     @Test
     fun `all production endpoints use TLS`() {
-        assertTrue(Blockchain.entries.flatMap(Blockchain::rpcUrls).all { it.startsWith("https://") })
-        assertTrue(Blockchain.entries.all { it.explorerUrl.startsWith("https://") })
+        // Quintium has no public endpoint yet; its node URL comes from the user.
+        val public = Blockchain.entries - Blockchain.QUINTIUM
+        assertTrue(public.flatMap(Blockchain::rpcUrls).all { it.startsWith("https://") })
+        assertTrue(public.all { it.explorerUrl.startsWith("https://") })
     }
 }

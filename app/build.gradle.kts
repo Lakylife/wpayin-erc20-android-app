@@ -12,8 +12,8 @@ android {
         applicationId = "io.noriskservis.wpayin.wallet"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.1.3"
+        versionCode = 6
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -39,6 +39,16 @@ android {
             }\"",
         )
         buildConfigField("int", "PLATFORM_FEE_BPS", "25")
+        // Optional Quintium node and explorer URLs for a release build, the same
+        // keys as on iOS. Empty ⇒ the user enters a node in Settings → Quintium.
+        listOf(
+            "QUINTIUM_RPC_URL",
+            "QUINTIUM_TESTNET_RPC_URL",
+            "QUINTIUM_EXPLORER_URL",
+            "QUINTIUM_TESTNET_EXPLORER_URL",
+        ).forEach { key ->
+            buildConfigField("String", key, "\"${providers.gradleProperty(key).orNull.orEmpty()}\"")
+        }
         // Optional public P2P offer board (Supabase PostgREST), same gating as iOS:
         // both values empty ⇒ the marketplace section stays hidden.
         buildConfigField(

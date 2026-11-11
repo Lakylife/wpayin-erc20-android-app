@@ -45,6 +45,8 @@ private class TrustWalletCoreEngine : WalletEngine {
             Blockchain.OPTIMISM to wallet.getAddressForCoin(CoinType.OPTIMISM),
             Blockchain.AVALANCHE to wallet.getAddressForCoin(CoinType.AVALANCHECCHAIN),
             Blockchain.BASE to wallet.getAddressForCoin(CoinType.BASE),
+            // Quintium uses Ethereum keys and addresses (m/44'/60'), like its desktop wallet.
+            Blockchain.QUINTIUM to wallet.getAddressForCoin(CoinType.ETHEREUM),
         )
     }
 
@@ -286,6 +288,7 @@ private class TrustWalletCoreEngine : WalletEngine {
         Blockchain.BASE -> CoinType.BASE
         Blockchain.BITCOIN -> CoinType.BITCOIN
         Blockchain.SOLANA -> CoinType.SOLANA
+        Blockchain.QUINTIUM -> CoinType.ETHEREUM
     }
 
     private fun Long?.asWalletCoreBytes(): ByteString =

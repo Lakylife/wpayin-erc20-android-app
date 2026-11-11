@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quintium (QU / tQU) coin, from coin.svg of the Quintium explorer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="#F2B544"
+        android:pathData="M32,2a30,30 0,1 1,0 60a30,30 0,1 1,0 -60z" />
+    <!-- Nonzero fill: the inner pentagon is wound the other way and stays a hole,
+         while the tail of the Q stays solid where it crosses the frame. -->
+    <path
+        android:fillColor="#0B1622"
+        android:fillType="nonZero"
+        android:pathData="M32,12.4L50.55,25.87L43.46,47.68L20.54,47.68L13.45,25.87ZM22.73,28.89L26.27,39.79L37.73,39.79L41.27,28.89L32,22.15ZM36.96,33.28L47.63,47.97L42.45,51.73L31.78,37.05Z" />
+</vector>

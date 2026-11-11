@@ -4,6 +4,8 @@ import io.noriskservis.wpayin.wallet.core.WalletEngine
 import io.noriskservis.wpayin.wallet.model.AppSettings
 import io.noriskservis.wpayin.wallet.model.Asset
 import io.noriskservis.wpayin.wallet.model.Blockchain
+import io.noriskservis.wpayin.wallet.model.QuintiumConfig
+import io.noriskservis.wpayin.wallet.model.QuintiumNetwork
 import io.noriskservis.wpayin.wallet.BuildConfig
 import io.noriskservis.wpayin.wallet.model.EvmTransferDraft
 import io.noriskservis.wpayin.wallet.model.FiatCurrency
@@ -235,11 +237,18 @@ class WalletRepository(
                     async {
                         val assetId = "${account.blockchain.name}:native"
                         val previous = previousAssets[assetId]
-                        val balance = runCatching {
-                            rpcService.nativeBalance(account.blockchain, account.address)
-                        }.getOrElse {
-                            failures.incrementAndGet()
-                            previous?.balance ?: 0.0
+                        // Quintium without a node yet is not a failure, it just has nothing to show.
+                        val balance = if (
+                            account.blockchain == Blockchain.QUINTIUM && !QuintiumConfig.isConfigured
+                        ) {
+                            0.0
+                        } else {
+                            runCatching {
+                                rpcService.nativeBalance(account.blockchain, account.address)
+                            }.getOrElse {
+                                failures.incrementAndGet()
+                                previous?.balance ?: 0.0
+                            }
                         }
                         Asset(
                             id = assetId,
@@ -1725,6 +1734,30 @@ class WalletRepository(
         refresh()
     }.onFailure { error ->
         mutableState.update { it.copy(errorMessage = error.userFacingMessage()) }
+    }
+
+    /**
+     * Saves the Quintium network, node and explorer. Switching between testnet
+     * and mainnet changes the coin (tQU / QU), so Quintium balances and history
+     * are dropped and fetched again from the chosen node.
+     */
+    suspend fun setQuintiumSettings(
+        network: QuintiumNetwork,
+        rpcUrl: String,
+        explorerUrl: String,
+    ): Result<Unit> = runCatching {
+        withContext(Dispatchers.IO) { settingsStore.saveQuintium(network, rpcUrl, explorerUrl) }
+        mutableState.update { state ->
+            state.copy(
+                wallet = state.wallet?.copy(
+                    assets = state.wallet.assets.filter { it.blockchain != Blockchain.QUINTIUM },
+                    lastUpdated = Instant.now(),
+                ),
+                transactions = state.transactions.filter { it.blockchain != Blockchain.QUINTIUM },
+                errorMessage = null,
+            )
+        }
+        refresh()
     }
 
     fun addSavedAddress(name: String, address: String): Result<SavedAddress> = runCatching {

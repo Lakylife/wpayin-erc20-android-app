@@ -60,6 +60,12 @@ fun CryptoTokenIcon(
 
 @Composable
 private fun CryptoTokenMark(asset: Asset, size: Int) {
+    // QU on mainnet and tQU on testnet. Only the native coin of the Quintium slot
+    // gets the mark, so a look-alike token named "QU" elsewhere keeps a plain icon.
+    if (asset.blockchain == Blockchain.QUINTIUM && asset.isNative) {
+        RasterCryptoIcon(R.drawable.crypto_quintium, size)
+        return
+    }
     when (asset.symbol.uppercase()) {
         "ETH", "WETH" -> RasterCryptoIcon(R.drawable.crypto_eth, size)
         "BTC" -> RasterCryptoIcon(R.drawable.crypto_btc, size)
@@ -110,6 +116,7 @@ fun CryptoNetworkIcon(blockchain: Blockchain, size: Int) {
             size = size,
             glyphScale = 0.64f,
         )
+        Blockchain.QUINTIUM -> RasterCryptoIcon(R.drawable.crypto_quintium, size)
     }
 }
 
@@ -230,4 +237,5 @@ private fun Blockchain.cryptoBrandColor(): Color = when (this) {
     Blockchain.OPTIMISM -> Color(0xFFFF0420)
     Blockchain.AVALANCHE -> Color(0xFFE84142)
     Blockchain.BASE -> Color(0xFF0052FF)
+    Blockchain.QUINTIUM -> Color(0xFFF2B544)
 }
