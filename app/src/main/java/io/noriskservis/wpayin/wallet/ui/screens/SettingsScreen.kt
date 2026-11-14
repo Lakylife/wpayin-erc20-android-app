@@ -132,7 +132,7 @@ fun SettingsScreen(
         done(Result.failure(IllegalStateException("Private keys are unavailable")))
     },
     onSaveQuintium: (QuintiumNetwork, String, String, (Result<Unit>) -> Unit) -> Unit = { _, _, _, done ->
-        done(Result.failure(IllegalStateException("Quintium settings are unavailable")))
+        done(Result.failure(IllegalStateException("Quinvium settings are unavailable")))
     },
     onNestedScreenChanged: (Boolean) -> Unit = {},
 ) {
@@ -476,7 +476,7 @@ fun SettingsScreen(
                     icon = Icons.Rounded.Pentagon,
                     title = stringResource(R.string.quintium_title),
                     subtitle = "${Blockchain.QUINTIUM.symbol} · " + stringResource(R.string.quintium_settings_subtitle),
-                    tint = Color(0xFFF2B544),
+                    tint = Color(0xFFFFCD02),
                     onClick = { showQuintium = true },
                 )
                 SettingsRow(

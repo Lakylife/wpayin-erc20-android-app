@@ -16,18 +16,18 @@ enum class QuintiumNetwork(
     val displayName: String,
     val defaultRpcPort: Int,
 ) {
-    MAINNET("mainnet", 52401, "QU", "Quintium", 8545),
-    TESTNET("testnet", 52402, "tQU", "Quintium Testnet", 8546);
+    MAINNET("mainnet", 52401, "QU", "Quinvium", 8545),
+    TESTNET("testnet", 52402, "tQU", "Quinvium Testnet", 8546);
 
     val isTestnet: Boolean
         get() = this == TESTNET
 
-    /** Mainnet genesis is planned for 1 January 2027 00:00 UTC; the testnet already runs. */
+    /** Mainnet genesis: 14 November 2026 00:00 CET (13 November 23:00 UTC), genesisTimestamp 1794610800. */
     fun isLaunched(now: Instant = Instant.now()): Boolean =
         this == TESTNET || !now.isBefore(MAINNET_GENESIS)
 
     companion object {
-        val MAINNET_GENESIS: Instant = Instant.ofEpochSecond(1_798_761_600)
+        val MAINNET_GENESIS: Instant = Instant.ofEpochSecond(1_794_610_800)
         const val DECIMALS = 18
         const val BLOCK_TIME_SECONDS = 15
         /** Ethereum keys and addresses (coin type 60), same as the Quintium desktop wallet. */

@@ -39,7 +39,7 @@ class QuintiumNodeClient(
             QuintiumConfig.rpcUrl,
             QuintiumNetwork.ADDRESS_TRANSACTIONS_METHOD,
             JSONArray().put(account.address).put(limit).put(0),
-        ) as? JSONObject ?: error("The Quintium node returned no transaction page")
+        ) as? JSONObject ?: error("The Quinvium node returned no transaction page")
         return parseQuintiumTransactions(account, page)
     }
 

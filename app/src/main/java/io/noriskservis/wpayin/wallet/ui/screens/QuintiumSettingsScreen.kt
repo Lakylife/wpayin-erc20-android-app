@@ -115,7 +115,7 @@ fun QuintiumSettingsScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     CryptoNetworkIcon(Blockchain.QUINTIUM, 72)
                     Text(
-                        "Quintium (${network.symbol})",
+                        "Quinvium (${network.symbol})",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 12.dp),

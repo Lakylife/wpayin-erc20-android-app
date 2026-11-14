@@ -237,5 +237,5 @@ private fun Blockchain.cryptoBrandColor(): Color = when (this) {
     Blockchain.OPTIMISM -> Color(0xFFFF0420)
     Blockchain.AVALANCHE -> Color(0xFFE84142)
     Blockchain.BASE -> Color(0xFF0052FF)
-    Blockchain.QUINTIUM -> Color(0xFFF2B544)
+    Blockchain.QUINTIUM -> Color(0xFFFFCD02)
 }

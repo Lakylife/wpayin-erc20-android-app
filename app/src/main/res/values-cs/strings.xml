@@ -538,16 +538,16 @@
     <string name="send_separate_fee_note" formatted="false">Poplatek aplikace se odesílá samostatným převodem. Maximální síťový poplatek výše zahrnuje oba převody.</string>
 
     <!-- Quintium -->
-    <string name="quintium_title">Quintium</string>
+    <string name="quintium_title">Quinvium</string>
     <string name="quintium_settings_subtitle">Síť, uzel a explorer</string>
-    <string name="quintium_intro">Náš vlastní blockchain s Proof-of-Work, kompatibilní s Ethereem. Vaše adresa na Quintiu je stejná jako adresa na Ethereu.</string>
+    <string name="quintium_intro">Náš vlastní blockchain s Proof-of-Work, kompatibilní s Ethereem. Vaše adresa na Quinviu je stejná jako adresa na Ethereu.</string>
     <string name="quintium_network">Síť</string>
     <string name="quintium_testnet">Testnet</string>
     <string name="quintium_mainnet">Mainnet</string>
-    <string name="quintium_mainnet_pending">Mainnet startuje 1. ledna 2027. Do té doby používejte testnet.</string>
+    <string name="quintium_mainnet_pending">Mainnet startuje 14. listopadu 2026 v 00:00 SEČ. Do té doby používejte testnet.</string>
     <string name="quintium_node">Uzel</string>
     <string name="quintium_rpc_url">RPC URL</string>
-    <string name="quintium_rpc_hint">Adresa uzlu Quintium s JSON-RPC (výchozí port %1$d). Veřejný uzel zatím není, zadejte tedy vlastní.</string>
+    <string name="quintium_rpc_hint">Adresa uzlu Quinvium s JSON-RPC (výchozí port %1$d). Veřejný uzel zatím není, zadejte tedy vlastní.</string>
     <string name="quintium_explorer_url">URL průzkumníku bloků</string>
     <string name="quintium_explorer_hint">Když pole necháte prázdné, transakce se otevřou v Exploreru přímo na uzlu.</string>
     <string name="quintium_test">Otestovat spojení</string>
@@ -564,6 +564,6 @@
     <string name="quintium_address_path">Cesta adres</string>
     <string name="quintium_save">Uložit</string>
     <string name="quintium_saved">Uloženo</string>
-    <string name="quintium_not_supported">Swap, most a ceny ve fiat měně zatím pro Quintium nejsou.</string>
-    <string name="quintium_no_node">Uzel není nastaven. Přidejte ho v Nastavení → Quintium.</string>
+    <string name="quintium_not_supported">Swap, most a ceny ve fiat měně zatím pro Quinvium nejsou.</string>
+    <string name="quintium_no_node">Uzel není nastaven. Přidejte ho v Nastavení → Quinvium.</string>
 </resources>

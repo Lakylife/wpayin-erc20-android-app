@@ -22,9 +22,9 @@ class QuintiumTest {
         assertEquals("tQU", QuintiumNetwork.TESTNET.symbol)
         assertEquals(8546, QuintiumNetwork.TESTNET.defaultRpcPort)
         assertEquals(18, Blockchain.QUINTIUM.decimals)
-        assertEquals(Instant.parse("2027-01-01T00:00:00Z"), QuintiumNetwork.MAINNET_GENESIS)
-        assertFalse(QuintiumNetwork.MAINNET.isLaunched(Instant.parse("2026-12-31T23:59:59Z")))
-        assertTrue(QuintiumNetwork.MAINNET.isLaunched(Instant.parse("2027-01-01T00:00:00Z")))
+        assertEquals(Instant.parse("2026-11-13T23:00:00Z"), QuintiumNetwork.MAINNET_GENESIS)
+        assertFalse(QuintiumNetwork.MAINNET.isLaunched(Instant.parse("2026-11-13T22:59:59Z")))
+        assertTrue(QuintiumNetwork.MAINNET.isLaunched(Instant.parse("2026-11-13T23:00:00Z")))
         assertTrue(QuintiumNetwork.TESTNET.isLaunched(Instant.parse("2026-11-11T00:00:00Z")))
     }
 
@@ -47,7 +47,7 @@ class QuintiumTest {
             emptyMap(),
         )
         assertEquals("QU", Blockchain.QUINTIUM.symbol)
-        assertEquals("Quintium", Blockchain.QUINTIUM.displayName)
+        assertEquals("Quinvium", Blockchain.QUINTIUM.displayName)
         assertEquals(52401L, Blockchain.QUINTIUM.chainId)
         assertEquals(listOf("https://node.example.org"), Blockchain.QUINTIUM.rpcUrls)
         // Without a separate explorer the node's own explorer pages are used.

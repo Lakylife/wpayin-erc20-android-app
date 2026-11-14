@@ -107,7 +107,7 @@ fun MainTabsScreen(
     onDeleteWallet: () -> Unit,
     onNetworkEnabled: (Blockchain, Boolean) -> Unit = { _, _ -> },
     onSaveQuintium: (QuintiumNetwork, String, String, (Result<Unit>) -> Unit) -> Unit = { _, _, _, done ->
-        done(Result.failure(IllegalStateException("Quintium settings are unavailable")))
+        done(Result.failure(IllegalStateException("Quinvium settings are unavailable")))
     },
     onPrepareExchange: (String, String, String, (Result<ExchangeQuote>) -> Unit) -> Unit = { _, _, _, done ->
         done(Result.failure(IllegalStateException("Quotes are unavailable")))

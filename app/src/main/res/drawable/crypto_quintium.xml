@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Quintium (QU / tQU) coin, from coin.svg of the Quintium explorer. -->
+<!-- Quinvium (QU / tQU) coin: the hexagon Q from Quinvium-Symbol.ttf, as coin.svg of the Quinvium Explorer. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="64dp"
     android:height="64dp"
     android:viewportWidth="64"
     android:viewportHeight="64">
     <path
-        android:fillColor="#F2B544"
+        android:fillColor="#FFCD02"
         android:pathData="M32,2a30,30 0,1 1,0 60a30,30 0,1 1,0 -60z" />
-    <!-- Nonzero fill: the inner pentagon is wound the other way and stays a hole,
-         while the tail of the Q stays solid where it crosses the frame. -->
+    <!-- Nonzero fill: the ring is one contour with the opening for the tail, the tail is the second contour. -->
     <path
         android:fillColor="#0B1622"
         android:fillType="nonZero"
-        android:pathData="M32,12.4L50.55,25.87L43.46,47.68L20.54,47.68L13.45,25.87ZM22.73,28.89L26.27,39.79L37.73,39.79L41.27,28.89L32,22.15ZM36.96,33.28L47.63,47.97L42.45,51.73L31.78,37.05Z" />
+        android:pathData="M28.19,35.31L29.82,37.13L35.52,43.07L41.75,49.92L49.85,49.92L41.99,41.06L37.63,36.22L37.01,35.69L36.62,35.45L36.05,35.31L31.02,35.31L30.97,35.26L30.87,35.31L29.92,35.31L29.87,35.26L29.77,35.31ZM32.26,12.35L31.16,12.35L30.68,12.45L30.01,12.64L29.34,12.97L22.97,17.14L16.3,21.65L15.68,22.08L15.35,22.46L14.91,23.04L14.39,24.04L14.29,24.43L14.15,25.15L14.15,39L14.34,40.05L14.77,41.11L15.2,41.68L16.06,42.54L20.81,45.71L28.91,51.07L29.68,51.46L30.59,51.65L32.02,51.6L32.6,51.46L33.41,51.07L38.25,47.58L34.56,43.45L34.42,43.5L32.41,44.94L31.88,45.23L31.64,45.32L30.97,45.32L30.39,45.08L24.79,41.25L21.24,38.9L20.76,38.37L20.47,37.8L20.28,37.08L20.28,27.4L20.38,26.97L20.62,26.39L20.81,26.15L21.38,25.58L28.19,21.07L30.92,19.25L31.59,19.06L31.88,19.06L32.41,19.2L33.94,20.16L36.43,21.89L41.47,25.24L42.33,26.01L42.57,26.49L42.71,27.21L42.71,37.51L42.57,38.33L42.33,38.81L41.75,39.33L45.4,43.41L45.49,43.55L45.59,43.55L47.12,42.5L47.7,42.06L48.08,41.68L48.7,40.72L48.89,40.2L49.09,39.19L49.09,25.15L48.94,24.33L48.75,23.71L48.37,22.99L47.98,22.46L47.41,21.89L46.26,21.07L36.62,14.6L33.8,12.83L33.22,12.54Z" />
 </vector>

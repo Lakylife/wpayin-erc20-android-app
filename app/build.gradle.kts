@@ -12,8 +12,8 @@ android {
         applicationId = "io.noriskservis.wpayin.wallet"
         minSdk = 26
         targetSdk = 37
-        versionCode = 6
-        versionName = "1.2.0"
+        versionCode = 8
+        versionName = "1.3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

@@ -105,11 +105,11 @@ enum class Blockchain(
 
     /**
      * One slot that follows the Quintium network chosen in Settings → Quintium
-     * (testnet tQU by default, mainnet QU from 1 January 2027). Quintium has
+     * (testnet tQU by default, mainnet QU from 14 November 2026). Quintium has
      * no CoinGecko listing yet, so it carries no fiat price.
      */
     QUINTIUM(
-        displayName = "Quintium",
+        displayName = "Quinvium",
         symbol = "QU",
         decimals = QuintiumNetwork.DECIMALS,
         chainId = QuintiumNetwork.MAINNET.chainId,
